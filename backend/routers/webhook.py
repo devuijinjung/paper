@@ -76,7 +76,8 @@ async def receive_webhook(
 
     # Normalize Korean JSON keys → English equivalents
     _KR = {"액션": "action", "티커": "ticker", "수량": "quantity",
-           "비밀": "secret", "가격": "price", "전략": "strategy"}
+           "비밀": "secret", "가격": "price", "전략": "strategy",
+           "비율": "order_size_pct"}
     payload = {_KR.get(k, k): v for k, v in payload.items()}
 
     # If action value is a long message string (not a direct alias), extract fields from it.
