@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useWebSocket } from "./useWebSocket";
+import { useBinanceStream } from "./useBinanceStream";
 import Summary from "./components/Summary";
 import LiveTicker from "./components/LiveTicker";
 import Positions from "./components/Positions";
@@ -22,61 +23,65 @@ async function fetchAll() {
   return { portfolio, trades, alerts };
 }
 
-async function fetchAlerts() {
-  return fetch("/api/alerts").then((r) => r.json());
-}
-
 export default function App() {
-  const [portfolio, setPortfolio] = useState(null);
-  const [trades, setTrades] = useState([]);
-  const [alerts, setAlerts] = useState([]);
-  const [market, setMarket] = useState(null);
-  const [tab, setTab] = useState(0);
-  const [wsStatus, setWsStatus] = useState("연결 중...");
-  const alertPollRef = useRef(null);
+  const [portfolio, setPortfolio]     = useState(null);
+  const [trades, setTrades]           = useState([]);
+  const [alerts, setAlerts]           = useState([]);
+  const [streamPrices, setStreamPrices] = useState({});  // { BTCUSDT: {price, change_pct, ...} }
+  const [tab, setTab]                 = useState(0);
+  const [wsStatus, setWsStatus]       = useState("연결 중...");
+  const alertPollRef                  = useRef(null);
 
+  // ── Initial load ──────────────────────────────────────────────────────────
   const load = useCallback(async () => {
     try {
       const data = await fetchAll();
       setPortfolio(data.portfolio);
       setTrades(data.trades);
       setAlerts(data.alerts);
-    } catch {
-      // backend not yet ready
-    }
+    } catch {}
   }, []);
 
   useEffect(() => { load(); }, [load]);
 
-  // Poll alerts every 10 s while the alert-log tab is active
+  // Poll alerts every 10 s while the alert tab is active
   useEffect(() => {
     if (tab === 3) {
-      fetchAlerts().then(setAlerts).catch(() => {});
+      fetch("/api/alerts").then((r) => r.json()).then(setAlerts).catch(() => {});
       alertPollRef.current = setInterval(() => {
-        fetchAlerts().then(setAlerts).catch(() => {});
+        fetch("/api/alerts").then((r) => r.json()).then(setAlerts).catch(() => {});
       }, 10000);
     }
     return () => clearInterval(alertPollRef.current);
   }, [tab]);
 
+  // ── Binance real-time stream ───────────────────────────────────────────────
+  // Always stream BTCUSDT + any open position tickers
+  const streamSymbols = useMemo(() => {
+    const tickers = portfolio?.positions?.map((p) => p.ticker) ?? [];
+    return [...new Set(["BTCUSDT", ...tickers])];
+  }, [portfolio?.positions]);
+
+  const onTick = useCallback((tick) => {
+    setStreamPrices((prev) => ({ ...prev, [tick.symbol]: tick }));
+  }, []);
+
+  useBinanceStream(streamSymbols, onTick);
+
+  // ── App WebSocket (trades / position DB updates) ───────────────────────────
   const onWsMessage = useCallback((msg) => {
-    if (msg.market) setMarket(msg.market);
+    if (msg.type === "trade") load();
     if (msg.summary) {
       setPortfolio((prev) => prev ? { ...prev, ...msg.summary } : msg.summary);
     }
-    if (msg.positions) {
-      setPortfolio((prev) => prev ? { ...prev, positions: msg.positions } : prev);
-    }
-    if (msg.type === "trade") load();
   }, [load]);
 
   const onWsOpen = useCallback(() => setWsStatus("연결됨"), []);
-
   useWebSocket(WS_URL, onWsMessage, onWsOpen);
 
   const handleTabChange = (i) => {
     setTab(i);
-    if (i === 3) fetchAlerts().then(setAlerts).catch(() => {});
+    if (i === 3) fetch("/api/alerts").then((r) => r.json()).then(setAlerts).catch(() => {});
     if (i === 1) fetch("/api/trades").then((r) => r.json()).then(setTrades).catch(() => {});
   };
 
@@ -96,11 +101,8 @@ export default function App() {
         </span>
       </header>
 
-      {/* 실시간 BTC 시세 티커 */}
-      <LiveTicker wsMarket={market} />
-
-      {/* 포트폴리오 요약 카드 */}
-      <Summary portfolio={portfolio} />
+      <LiveTicker data={streamPrices["BTCUSDT"]} />
+      <Summary portfolio={portfolio} streamPrices={streamPrices} />
 
       <nav className="flex gap-1 mb-4 border-b border-gray-800 pb-2">
         {TABS.map((t, i) => (
@@ -119,7 +121,7 @@ export default function App() {
       </nav>
 
       <div className="bg-gray-900 rounded-xl p-4 shadow-xl min-h-48">
-        {tab === 0 && <Positions positions={portfolio?.positions} />}
+        {tab === 0 && <Positions positions={portfolio?.positions} streamPrices={streamPrices} />}
         {tab === 1 && <Trades trades={trades} />}
         {tab === 2 && <EquityCurve history={portfolio?.balance_history} />}
         {tab === 3 && <AlertLogs logs={alerts} />}

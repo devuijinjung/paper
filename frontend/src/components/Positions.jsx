@@ -1,4 +1,34 @@
-export default function Positions({ positions }) {
+import { useFlash } from "../useFlash";
+
+function PositionRow({ p, streamPrice }) {
+  const livePrice       = streamPrice?.price ?? p.current_price;
+  const unrealizedPnl   = (livePrice - p.avg_price) * p.qty;
+  const pct             = p.avg_price > 0
+    ? ((livePrice - p.avg_price) / p.avg_price) * 100
+    : 0;
+  const isPos           = unrealizedPnl >= 0;
+  const priceFashCls    = useFlash(livePrice);
+  const pnlFlashCls     = useFlash(unrealizedPnl);
+
+  return (
+    <tr className="border-b border-gray-800 hover:bg-gray-800/50 transition-colors">
+      <td className="py-2 pr-4 font-medium text-white">{p.ticker}</td>
+      <td className="py-2 pr-4 tabular-nums">{p.qty.toFixed(6)}</td>
+      <td className="py-2 pr-4 tabular-nums">${p.avg_price.toFixed(2)}</td>
+      <td className={`py-2 pr-4 tabular-nums ${priceFashCls}`}>
+        ${livePrice.toLocaleString("en", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+      </td>
+      <td className={`py-2 pr-4 tabular-nums ${isPos ? "text-emerald-400" : "text-rose-400"} ${pnlFlashCls}`}>
+        {isPos ? "+" : ""}{unrealizedPnl.toFixed(2)}
+      </td>
+      <td className={`py-2 pr-4 tabular-nums ${isPos ? "text-emerald-400" : "text-rose-400"}`}>
+        {isPos ? "+" : ""}{pct.toFixed(2)}%
+      </td>
+    </tr>
+  );
+}
+
+export default function Positions({ positions, streamPrices }) {
   if (!positions?.length)
     return <p className="text-gray-500 text-sm py-4">보유 포지션 없음</p>;
 
@@ -13,26 +43,13 @@ export default function Positions({ positions }) {
           </tr>
         </thead>
         <tbody>
-          {positions.map((p) => {
-            const pct = p.avg_price > 0
-              ? ((p.current_price - p.avg_price) / p.avg_price) * 100
-              : 0;
-            const isPos = p.unrealized_pnl >= 0;
-            return (
-              <tr key={p.ticker} className="border-b border-gray-800 hover:bg-gray-800/50">
-                <td className="py-2 pr-4 font-medium text-white">{p.ticker}</td>
-                <td className="py-2 pr-4">{p.qty.toFixed(6)}</td>
-                <td className="py-2 pr-4">${p.avg_price.toFixed(4)}</td>
-                <td className="py-2 pr-4">${p.current_price.toFixed(4)}</td>
-                <td className={`py-2 pr-4 ${isPos ? "text-emerald-400" : "text-rose-400"}`}>
-                  {isPos ? "+" : ""}{p.unrealized_pnl.toFixed(2)}
-                </td>
-                <td className={`py-2 pr-4 ${isPos ? "text-emerald-400" : "text-rose-400"}`}>
-                  {isPos ? "+" : ""}{pct.toFixed(2)}%
-                </td>
-              </tr>
-            );
-          })}
+          {positions.map((p) => (
+            <PositionRow
+              key={p.ticker}
+              p={p}
+              streamPrice={streamPrices?.[p.ticker]}
+            />
+          ))}
         </tbody>
       </table>
     </div>

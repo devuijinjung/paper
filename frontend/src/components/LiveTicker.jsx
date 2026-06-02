@@ -1,49 +1,15 @@
-import { useEffect, useRef, useState, useCallback } from "react";
 import { useFlash } from "../useFlash";
 
-const BINANCE_24H = "https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT";
-
-export default function LiveTicker({ wsMarket }) {
-  const [market, setMarket] = useState(null);
-  const intervalRef = useRef(null);
-
-  const fetchMarket = useCallback(async () => {
-    try {
-      const d = await fetch(BINANCE_24H).then((r) => r.json());
-      if (d?.lastPrice) {
-        setMarket({
-          price: parseFloat(d.lastPrice),
-          change_pct: parseFloat(d.priceChangePercent),
-          high: parseFloat(d.highPrice),
-          low: parseFloat(d.lowPrice),
-          volume: parseFloat(d.quoteVolume),
-        });
-      }
-    } catch {}
-  }, []);
-
-  // Fetch from Binance directly on mount, then every 10 s
-  useEffect(() => {
-    fetchMarket();
-    intervalRef.current = setInterval(fetchMarket, 10000);
-    return () => clearInterval(intervalRef.current);
-  }, [fetchMarket]);
-
-  // WebSocket overrides with the freshest price when available
-  useEffect(() => {
-    if (wsMarket?.price) {
-      setMarket((prev) => prev ? { ...prev, price: wsMarket.price } : wsMarket);
-    }
-  }, [wsMarket]);
-
-  const price = market?.price ?? null;
-  const changePct = market?.change_pct ?? null;
-  const high = market?.high ?? null;
-  const low = market?.low ?? null;
-  const volume = market?.volume ?? null;
+/** data = { price, change_pct, high, low, volume } from Binance stream */
+export default function LiveTicker({ data }) {
+  const price     = data?.price ?? null;
+  const changePct = data?.change_pct ?? null;
+  const high      = data?.high ?? null;
+  const low       = data?.low ?? null;
+  const volume    = data?.volume ?? null;
 
   const flashCls = useFlash(price);
-  const isPos = (changePct ?? 0) >= 0;
+  const isPos    = (changePct ?? 0) >= 0;
 
   return (
     <div className="bg-gray-800/80 border border-gray-700 rounded-2xl px-5 py-3 mb-6 flex flex-wrap items-center gap-x-6 gap-y-2">
@@ -57,7 +23,7 @@ export default function LiveTicker({ wsMarket }) {
             ${price.toLocaleString("en", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </span>
         ) : (
-          <span className="text-gray-500 text-sm animate-pulse">로딩 중…</span>
+          <span className="text-gray-500 text-sm animate-pulse">연결 중…</span>
         )}
       </div>
 
