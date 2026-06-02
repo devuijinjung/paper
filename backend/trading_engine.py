@@ -203,7 +203,12 @@ class TradingEngine:
             len([t for t in closed if t.realized_pnl > 0]) / len(closed) * 100
             if closed else 0.0
         )
-        total_return_pct = (equity / settings.initial_capital - 1) * 100
+        first = await db.execute(
+            select(BalanceHistory).order_by(BalanceHistory.ts.asc()).limit(1)
+        )
+        first_row = first.scalar_one_or_none()
+        baseline = first_row.equity if first_row else settings.initial_capital
+        total_return_pct = (equity / baseline - 1) * 100 if baseline else 0.0
 
         return {
             "cash": cash,
