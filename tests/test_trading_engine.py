@@ -185,3 +185,46 @@ async def test_win_rate_calculation(db, eng):
 
     summary = await eng.get_portfolio_summary(db)
     assert summary["win_rate"] == 50.0
+
+
+# ── Action alias tests ──────────────────────────────────────────────────────
+
+def test_action_aliases():
+    from schemas import WebhookPayload, _ACTION_ALIASES
+
+    buy_variants   = ["buy", "long", "open_long", "entry_long", "enterlong", "b"]
+    sell_variants  = ["sell", "short", "open_short", "entry_short", "entershort", "s"]
+    close_variants = ["close", "exit", "flat", "close_long", "close_short",
+                      "exit_long", "exit_short", "tp", "sl"]
+
+    base = dict(secret="x", ticker="BTCUSDT", price=50000.0)
+
+    for v in buy_variants:
+        p = WebhookPayload(**base, action=v)
+        assert p.action == "buy", f"'{v}' should map to 'buy'"
+
+    for v in sell_variants:
+        p = WebhookPayload(**base, action=v)
+        assert p.action == "sell", f"'{v}' should map to 'sell'"
+
+    for v in close_variants:
+        p = WebhookPayload(**base, action=v)
+        assert p.action == "close", f"'{v}' should map to 'close'"
+
+
+def test_unknown_action_raises():
+    from schemas import WebhookPayload
+    from pydantic import ValidationError
+    import pytest
+
+    with pytest.raises(ValidationError):
+        WebhookPayload(secret="x", ticker="BTCUSDT", action="unknown_action", price=1.0)
+
+
+def test_action_case_insensitive():
+    from schemas import WebhookPayload
+    base = dict(secret="x", ticker="BTCUSDT", price=50000.0)
+    assert WebhookPayload(**base, action="BUY").action   == "buy"
+    assert WebhookPayload(**base, action="Long").action  == "buy"
+    assert WebhookPayload(**base, action="SHORT").action == "sell"
+    assert WebhookPayload(**base, action="Exit").action  == "close"

@@ -3,10 +3,46 @@ from typing import Optional
 from pydantic import BaseModel, field_validator
 
 
+# Maps every common TradingView action keyword → canonical buy / sell / close
+_ACTION_ALIASES: dict[str, str] = {
+    # ── buy / long ──────────────────────────────
+    "buy":          "buy",
+    "long":         "buy",
+    "open_long":    "buy",
+    "entry_long":   "buy",
+    "long_entry":   "buy",
+    "enterlong":    "buy",
+    "b":            "buy",
+    # ── sell / short ────────────────────────────
+    "sell":         "sell",
+    "short":        "sell",
+    "open_short":   "sell",
+    "entry_short":  "sell",
+    "short_entry":  "sell",
+    "entershort":   "sell",
+    "s":            "sell",
+    # ── close / exit ────────────────────────────
+    "close":        "close",
+    "exit":         "close",
+    "flat":         "close",
+    "close_long":   "close",
+    "close_short":  "close",
+    "exit_long":    "close",
+    "exit_short":   "close",
+    "closelong":    "close",
+    "closeshort":   "close",
+    "exitlong":     "close",
+    "exitshort":    "close",
+    "close_all":    "close",
+    "tp":           "close",   # take-profit treated as close
+    "sl":           "close",   # stop-loss treated as close
+}
+
+
 class WebhookPayload(BaseModel):
     secret: str
     ticker: str
-    action: str           # buy | sell | close
+    action: str           # any alias above — normalised to buy | sell | close
     price: Optional[float] = None
     order_size_pct: Optional[float] = None  # % of cash to use
     quantity: Optional[float] = None        # explicit qty override
@@ -16,10 +52,11 @@ class WebhookPayload(BaseModel):
     @field_validator("action")
     @classmethod
     def validate_action(cls, v: str) -> str:
-        allowed = {"buy", "sell", "close"}
-        if v.lower() not in allowed:
-            raise ValueError(f"action must be one of {allowed}")
-        return v.lower()
+        normalised = _ACTION_ALIASES.get(v.lower().strip())
+        if normalised is None:
+            supported = ", ".join(sorted(_ACTION_ALIASES))
+            raise ValueError(f"Unknown action '{v}'. Supported: {supported}")
+        return normalised
 
     @field_validator("ticker")
     @classmethod
