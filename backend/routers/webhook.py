@@ -74,6 +74,18 @@ async def receive_webhook(
         except Exception:
             payload = {}
 
+    # If action value is a long message string (not a direct alias), extract fields from it.
+    # Handles TradingView default message wrapped in JSON, e.g.:
+    #   {"action": "오더 sell @ 2 필드 온 BTCUSDT...", "secret": "..."}
+    action_val = str(payload.get("action", ""))
+    if action_val and action_val.lower().strip() not in _ACTION_ALIASES:
+        extracted = _parse_text_body(action_val)
+        if "action" in extracted:
+            payload["action"] = extracted["action"]
+        for k, v in extracted.items():
+            if k != "action":
+                payload.setdefault(k, v)
+
     # Query-string parameters override body fields (enables message-free webhook URLs)
     if q_secret is not None: payload["secret"] = q_secret
     if q_action is not None: payload["action"] = q_action
