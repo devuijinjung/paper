@@ -135,7 +135,7 @@ class TradingEngine:
         cost = exec_price * qty
         fee = cost * self.fee_rate
         total_cost = cost + fee
-        if total_cost > cash:
+        if total_cost > cash + 1e-8:
             raise InsufficientFundsError(
                 f"잔고 부족: {total_cost:.2f} 필요, {cash:.2f} 보유")
 
@@ -151,7 +151,7 @@ class TradingEngine:
         pos.current_price = exec_price
         pos.unrealized_pnl = (exec_price - pos.avg_price) * pos.qty
 
-        new_cash = cash - total_cost
+        new_cash = max(0.0, cash - total_cost)
         await self._set_cash(db, new_cash)
 
         trade = Trade(ticker=ticker, side="long", price=exec_price,
@@ -184,7 +184,7 @@ class TradingEngine:
         margin = exec_price * qty
         fee = margin * self.fee_rate
         total_cost = margin + fee
-        if total_cost > cash:
+        if total_cost > cash + 1e-8:
             raise InsufficientFundsError(
                 f"잔고 부족: {total_cost:.2f} 필요, {cash:.2f} 보유")
 
@@ -200,7 +200,7 @@ class TradingEngine:
         pos.current_price = exec_price
         pos.unrealized_pnl = (pos.avg_price - exec_price) * pos.qty
 
-        new_cash = cash - total_cost
+        new_cash = max(0.0, cash - total_cost)
         await self._set_cash(db, new_cash)
 
         trade = Trade(ticker=ticker, side="short", price=exec_price,
