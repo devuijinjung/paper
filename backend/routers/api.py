@@ -81,3 +81,44 @@ async def reset_account(req: ResetRequest, db: AsyncSession = Depends(get_db)):
     await engine.reset(db, req.initial_capital)
     await db.commit()
     return {"status": "ok", "message": "Account reset"}
+
+
+@router.get("/stats")
+async def get_stats(db: AsyncSession = Depends(get_db)):
+    trades_res  = await db.execute(select(Trade).order_by(Trade.ts))
+    trades      = list(trades_res.scalars().all())
+    history_res = await db.execute(select(BalanceHistory).order_by(BalanceHistory.ts))
+    history     = list(history_res.scalars().all())
+    pos_res     = await db.execute(select(Position).where(Position.qty > 0))
+    open_pos    = len(pos_res.scalars().all())
+
+    closed       = [t for t in trades if t.realized_pnl != 0]
+    wins         = [t for t in closed if t.realized_pnl > 0]
+    losses       = [t for t in closed if t.realized_pnl < 0]
+    gross_profit = sum(t.realized_pnl for t in wins)
+    gross_loss   = abs(sum(t.realized_pnl for t in losses))
+
+    # Max drawdown from equity history
+    max_dd, peak = 0.0, 0.0
+    for h in history:
+        if h.equity > peak:
+            peak = h.equity
+        if peak > 0:
+            dd = (h.equity - peak) / peak * 100
+            if dd < max_dd:
+                max_dd = dd
+
+    return {
+        "total_trades":     len(trades),
+        "closed_trades":    len(closed),
+        "win_count":        len(wins),
+        "loss_count":       len(losses),
+        "win_rate":         len(wins) / len(closed) * 100 if closed else 0,
+        "total_pnl":        sum(t.realized_pnl for t in closed),
+        "avg_win":          gross_profit / len(wins) if wins else 0,
+        "avg_loss":         -(gross_loss / len(losses)) if losses else 0,
+        "profit_factor":    gross_profit / gross_loss if gross_loss > 0 else 0,
+        "max_drawdown_pct": max_dd,
+        "total_fees":       sum(t.fee for t in trades),
+        "open_positions":   open_pos,
+    }

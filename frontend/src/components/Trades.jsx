@@ -1,40 +1,85 @@
+import { useState } from "react";
+
+const PAGE = 20;
+
 export default function Trades({ trades }) {
+  const [page, setPage] = useState(0);
+
   if (!trades?.length)
-    return <p className="text-gray-500 text-sm py-4">거래 내역 없음</p>;
+    return <div className="flex items-center justify-center h-32 text-gray-600">거래 내역 없음</div>;
+
+  const totalPnl = trades.reduce((s, t) => s + t.realized_pnl, 0);
+  const start    = page * PAGE;
+  const slice    = trades.slice(start, start + PAGE);
+  const pages    = Math.ceil(trades.length / PAGE);
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="text-gray-400 text-xs border-b border-gray-700">
-            {["시각", "종목", "방향", "가격", "수량", "수수료", "실현손익"].map((h) => (
-              <th key={h} className="py-2 pr-4 text-left font-medium">{h}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {trades.map((t) => {
-            const isPos = t.realized_pnl >= 0;
-            return (
-              <tr key={t.id} className="border-b border-gray-800 hover:bg-gray-800/50">
-                <td className="py-2 pr-4 text-gray-400 whitespace-nowrap">
-                  {new Date(t.ts).toLocaleString("ko")}
-                </td>
-                <td className="py-2 pr-4 font-medium text-white">{t.ticker}</td>
-                <td className={`py-2 pr-4 font-semibold ${t.side === "buy" ? "text-emerald-400" : "text-rose-400"}`}>
-                  {t.side.toUpperCase()}
-                </td>
-                <td className="py-2 pr-4">${t.price.toFixed(4)}</td>
-                <td className="py-2 pr-4">{t.qty.toFixed(6)}</td>
-                <td className="py-2 pr-4 text-gray-400">${t.fee.toFixed(4)}</td>
-                <td className={`py-2 pr-4 ${t.realized_pnl === 0 ? "text-gray-500" : isPos ? "text-emerald-400" : "text-rose-400"}`}>
-                  {t.realized_pnl === 0 ? "-" : `${isPos ? "+" : ""}${t.realized_pnl.toFixed(2)}`}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+    <div className="space-y-3">
+      {/* Summary bar */}
+      <div className="flex items-center justify-between px-1 text-sm">
+        <span className="text-gray-500">총 {trades.length}건</span>
+        <span className={`font-semibold tabular-nums ${totalPnl >= 0 ? "val-pos" : "val-neg"}`}>
+          실현손익 {totalPnl >= 0 ? "+" : ""}${totalPnl.toFixed(2)}
+        </span>
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-gray-800">
+              {["시각","종목","방향","체결가","수량","수수료","실현손익","전략"].map(h => (
+                <th key={h} className="py-2 pr-4 text-left label">{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {slice.map(t => {
+              const pnlPos = t.realized_pnl >= 0;
+              return (
+                <tr key={t.id} className="border-b border-gray-800/50 hover:bg-gray-800/30 transition-colors">
+                  <td className="py-2.5 pr-4 text-gray-500 text-xs whitespace-nowrap">
+                    {new Date(t.ts).toLocaleString("ko",{month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"})}
+                  </td>
+                  <td className="py-2.5 pr-4 font-medium">{t.ticker}</td>
+                  <td className={`py-2.5 pr-4 font-bold text-xs px-2 rounded ${
+                    t.side === "buy" ? "text-emerald-400" : "text-rose-400"
+                  }`}>
+                    {t.side === "buy" ? "매수" : "매도"}
+                  </td>
+                  <td className="py-2.5 pr-4 tabular-nums">${t.price.toLocaleString("en",{minimumFractionDigits:2})}</td>
+                  <td className="py-2.5 pr-4 tabular-nums text-gray-400">{t.qty.toFixed(6)}</td>
+                  <td className="py-2.5 pr-4 tabular-nums text-gray-500">${t.fee.toFixed(3)}</td>
+                  <td className={`py-2.5 pr-4 tabular-nums font-medium ${
+                    t.realized_pnl === 0 ? "text-gray-600"
+                    : pnlPos ? "val-pos" : "val-neg"
+                  }`}>
+                    {t.realized_pnl === 0 ? "—"
+                      : `${pnlPos?"+":""}$${Math.abs(t.realized_pnl).toFixed(2)}`}
+                  </td>
+                  <td className="py-2.5 text-gray-600 text-xs">{t.strategy ?? "—"}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Pagination */}
+      {pages > 1 && (
+        <div className="flex items-center justify-end gap-2 pt-1">
+          <button
+            disabled={page === 0}
+            onClick={() => setPage(p => p - 1)}
+            className="px-3 py-1 text-xs rounded-lg bg-gray-800 text-gray-400 hover:text-white disabled:opacity-30 transition"
+          >← 이전</button>
+          <span className="text-xs text-gray-500">{page + 1} / {pages}</span>
+          <button
+            disabled={page >= pages - 1}
+            onClick={() => setPage(p => p + 1)}
+            className="px-3 py-1 text-xs rounded-lg bg-gray-800 text-gray-400 hover:text-white disabled:opacity-30 transition"
+          >다음 →</button>
+        </div>
+      )}
     </div>
   );
 }
