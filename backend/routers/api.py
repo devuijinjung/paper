@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from config import settings
 from database import get_db
 from models import Trade, Position, BalanceHistory, AlertLog
+from price_feed import fetch_24hr_stats, fetch_prices
 from schemas import (
     PortfolioOut, TradeOut, PositionOut, AlertLogOut,
     BalanceHistoryOut, ResetRequest,
@@ -56,6 +57,19 @@ async def get_alerts(limit: int = 50, db: AsyncSession = Depends(get_db)):
         select(AlertLog).order_by(AlertLog.ts.desc()).limit(limit)
     )
     return [AlertLogOut.model_validate(a) for a in res.scalars().all()]
+
+
+@router.get("/market")
+async def get_market():
+    """Return live BTC/USDT price + 24h stats directly from Binance."""
+    stats = await fetch_24hr_stats("BTCUSDT")
+    if stats:
+        return stats
+    # fallback: at least return a spot price
+    prices = await fetch_prices(["BTCUSDT"])
+    if prices:
+        return {"price": prices["BTCUSDT"]}
+    return {}
 
 
 @router.post("/reset")

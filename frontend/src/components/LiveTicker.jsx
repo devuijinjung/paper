@@ -1,6 +1,29 @@
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useFlash } from "../useFlash";
 
-export default function LiveTicker({ market }) {
+export default function LiveTicker({ wsMarket }) {
+  const [market, setMarket] = useState(null);
+  const intervalRef = useRef(null);
+
+  const fetchMarket = useCallback(async () => {
+    try {
+      const data = await fetch("/api/market").then((r) => r.json());
+      if (data?.price) setMarket(data);
+    } catch {}
+  }, []);
+
+  // Fetch immediately on mount, then every 5 s as fallback
+  useEffect(() => {
+    fetchMarket();
+    intervalRef.current = setInterval(fetchMarket, 5000);
+    return () => clearInterval(intervalRef.current);
+  }, [fetchMarket]);
+
+  // Prefer WebSocket data (lower latency) when available
+  useEffect(() => {
+    if (wsMarket?.price) setMarket(wsMarket);
+  }, [wsMarket]);
+
   const price = market?.price ?? null;
   const changePct = market?.change_pct ?? null;
   const high = market?.high ?? null;

@@ -97,7 +97,7 @@ export default function App() {
       </header>
 
       {/* 실시간 BTC 시세 티커 */}
-      <LiveTicker market={market} />
+      <LiveTicker wsMarket={market} />
 
       {/* 포트폴리오 요약 카드 */}
       <Summary portfolio={portfolio} />
