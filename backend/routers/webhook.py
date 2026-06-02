@@ -74,6 +74,11 @@ async def receive_webhook(
         except Exception:
             payload = {}
 
+    # Normalize Korean JSON keys → English equivalents
+    _KR = {"액션": "action", "티커": "ticker", "수량": "quantity",
+           "비밀": "secret", "가격": "price", "전략": "strategy"}
+    payload = {_KR.get(k, k): v for k, v in payload.items()}
+
     # If action value is a long message string (not a direct alias), extract fields from it.
     # Handles TradingView default message wrapped in JSON, e.g.:
     #   {"action": "오더 sell @ 2 필드 온 BTCUSDT...", "secret": "..."}

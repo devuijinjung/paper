@@ -5,6 +5,13 @@ from pydantic import BaseModel, field_validator
 
 # Maps every common TradingView action keyword → canonical buy / sell / close
 _ACTION_ALIASES: dict[str, str] = {
+    # ── Korean ──────────────────────────────────
+    "매수":         "buy",
+    "구매":         "buy",
+    "판매":         "sell",
+    "매도":         "sell",
+    "청산":         "close",
+    "종료":         "close",
     # ── buy / long ──────────────────────────────
     "buy":          "buy",
     "long":         "buy",
