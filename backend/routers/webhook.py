@@ -34,13 +34,17 @@ async def receive_webhook(
     q_ticker: Optional[str] = Query(None, alias="ticker"),
     q_secret: Optional[str] = Query(None, alias="secret"),
 ):
-    # Parse body as JSON; fall back to {} for empty or non-JSON bodies
+    # Parse body: try JSON first, then plain text (treated as action)
     try:
         payload: dict[str, Any] = await request.json()
         if not isinstance(payload, dict):
             payload = {}
     except Exception:
-        payload = {}
+        try:
+            text = (await request.body()).decode().strip()
+            payload = {"action": text} if text else {}
+        except Exception:
+            payload = {}
 
     # Query-string parameters override body fields (enables message-free webhook URLs)
     if q_secret is not None: payload["secret"] = q_secret

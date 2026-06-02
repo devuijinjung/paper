@@ -65,11 +65,13 @@ export default function Settings({ onReset }) {
   return (
     <div className="space-y-6 max-w-lg">
 
-      {/* ── URL 빌더 (메시지 불필요) ── */}
+      {/* ── URL 빌더 ── */}
       <div>
-        <p className="label mb-1">URL 방식 웹훅</p>
+        <p className="label mb-1">웹훅 URL</p>
         <p className="text-xs text-gray-500 mb-3">
-          아래 URL을 TradingView 웹훅 URL 칸에 넣으면 알림 메시지를 비워도 자동으로 매수/매도됩니다.
+          URL 하나로 매수·매도 모두 처리합니다.
+          알림 메시지에 <span className="text-emerald-400 font-mono">buy</span> 또는{" "}
+          <span className="text-rose-400 font-mono">sell</span>만 입력하면 됩니다.
         </p>
 
         <div className="flex gap-2 mb-3">
@@ -78,7 +80,7 @@ export default function Settings({ onReset }) {
             onChange={e => setUrlTicker(e.target.value.toUpperCase())}
             placeholder="티커 (예: BTCUSDT)"
             className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm
-                       focus:outline-none focus:ring-1 focus:ring-emerald-500 uppercase"
+                       focus:outline-none focus:ring-1 focus:ring-emerald-500"
           />
           <input
             value={urlSecret}
@@ -90,9 +92,19 @@ export default function Settings({ onReset }) {
           />
         </div>
 
-        <div className="space-y-2">
-          <CopyRow label="매수 URL (Buy)" url={buyUrl} color="text-emerald-400" />
-          <CopyRow label="매도 URL (Sell)" url={sellUrl} color="text-rose-400" />
+        <CopyRow label="웹훅 URL (매수·매도 공용)" url={`${base}?ticker=${urlTicker || "BTCUSDT"}${secretPart}`} />
+
+        <div className="mt-3 bg-gray-950 border border-gray-800 rounded-lg p-3 text-xs space-y-1.5">
+          <p className="text-gray-500 font-medium">TradingView 알림 메시지 설정</p>
+          <div className="flex gap-3">
+            <span className="text-gray-600">매수 알림:</span>
+            <code className="text-emerald-400">buy</code>
+          </div>
+          <div className="flex gap-3">
+            <span className="text-gray-600">매도 알림:</span>
+            <code className="text-rose-400">sell</code>
+          </div>
+          <p className="text-gray-700 pt-1">long / short / close 등 다른 키워드도 사용 가능</p>
         </div>
 
         <p className="text-xs text-gray-600 mt-2">
