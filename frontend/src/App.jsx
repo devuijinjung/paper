@@ -42,7 +42,6 @@ export default function App() {
   useEffect(() => { load(); }, [load]);
 
   const onWsMessage = useCallback((msg) => {
-    setWsStatus("연결됨");
     if (msg.summary) {
       setPortfolio((prev) => prev ? { ...prev, ...msg.summary } : msg.summary);
     }
@@ -55,7 +54,9 @@ export default function App() {
     }
   }, [load]);
 
-  useWebSocket(WS_URL, onWsMessage);
+  const onWsOpen = useCallback(() => setWsStatus("연결됨"), []);
+
+  useWebSocket(WS_URL, onWsMessage, onWsOpen);
 
   return (
     <div className="min-h-screen p-4 md:p-8 max-w-6xl mx-auto">

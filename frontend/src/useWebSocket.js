@@ -1,12 +1,14 @@
 import { useEffect, useRef, useCallback } from "react";
 
-export function useWebSocket(url, onMessage) {
+export function useWebSocket(url, onMessage, onOpen) {
   const wsRef = useRef(null);
   const reconnectRef = useRef(null);
 
   const connect = useCallback(() => {
     const ws = new WebSocket(url);
     wsRef.current = ws;
+
+    ws.onopen = () => onOpen?.();
 
     ws.onmessage = (e) => {
       try {
@@ -15,12 +17,11 @@ export function useWebSocket(url, onMessage) {
     };
 
     ws.onclose = () => {
-      // Reconnect after 3 s
       reconnectRef.current = setTimeout(connect, 3000);
     };
 
     ws.onerror = () => ws.close();
-  }, [url, onMessage]);
+  }, [url, onMessage, onOpen]);
 
   useEffect(() => {
     connect();
