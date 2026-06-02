@@ -86,10 +86,6 @@ function TestTrade({ onDone }) {
     </div>
   );
 }
-      </div>
-    </div>
-  );
-}
 
 export default function Settings({ onReset, onTrade }) {
   const [capital,   setCapital]   = useState("10000");
