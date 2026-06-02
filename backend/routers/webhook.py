@@ -1,8 +1,8 @@
 import json
 import logging
-from typing import Any
+from typing import Any, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import settings
@@ -27,7 +27,26 @@ async def _get_exec_price(payload: WebhookPayload) -> float:
 
 
 @router.post("/webhook")
-async def receive_webhook(payload: dict[str, Any], db: AsyncSession = Depends(get_db)):
+async def receive_webhook(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    q_action: Optional[str] = Query(None, alias="action"),
+    q_ticker: Optional[str] = Query(None, alias="ticker"),
+    q_secret: Optional[str] = Query(None, alias="secret"),
+):
+    # Parse body as JSON; fall back to {} for empty or non-JSON bodies
+    try:
+        payload: dict[str, Any] = await request.json()
+        if not isinstance(payload, dict):
+            payload = {}
+    except Exception:
+        payload = {}
+
+    # Query-string parameters override body fields (enables message-free webhook URLs)
+    if q_secret is not None: payload["secret"] = q_secret
+    if q_action is not None: payload["action"] = q_action
+    if q_ticker is not None: payload["ticker"] = q_ticker
+
     raw = json.dumps(payload)
 
     try:

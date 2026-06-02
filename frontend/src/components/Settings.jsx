@@ -1,15 +1,46 @@
 import { useState } from "react";
 
+function CopyRow({ label, url, color = "text-emerald-400" }) {
+  const [copied, setCopied] = useState(false);
+  const copy = () => {
+    navigator.clipboard?.writeText(url).catch(() => {});
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+  return (
+    <div>
+      <p className="text-xs text-gray-500 mb-1">{label}</p>
+      <div className="flex gap-2">
+        <code className={`flex-1 bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs ${color} break-all`}>
+          {url}
+        </code>
+        <button
+          onClick={copy}
+          className="flex-shrink-0 px-3 py-2 text-xs bg-gray-800 hover:bg-gray-700 rounded-lg transition text-gray-300"
+        >{copied ? "✓" : "복사"}</button>
+      </div>
+    </div>
+  );
+}
+
 export default function Settings({ onReset }) {
-  const [capital,  setCapital]  = useState("10000");
-  const [fee,      setFee]      = useState("0.001");
-  const [slip,     setSlip]     = useState("0.0005");
-  const [msg,      setMsg]      = useState(null); // { text, ok }
-  const [confirm,  setConfirm]  = useState(false);
+  const [capital,   setCapital]   = useState("10000");
+  const [fee,       setFee]       = useState("0.001");
+  const [slip,      setSlip]      = useState("0.0005");
+  const [msg,       setMsg]       = useState(null);
+  const [confirm,   setConfirm]   = useState(false);
 
-  const webhookUrl = `${window.location.origin}/webhook`;
+  // URL builder state
+  const [urlTicker, setUrlTicker] = useState("BTCUSDT");
+  const [urlSecret, setUrlSecret] = useState("");
 
-  const copy = (text) => navigator.clipboard?.writeText(text).catch(() => {});
+  const origin     = window.location.origin;
+  const base       = `${origin}/webhook`;
+  const secretPart = urlSecret ? `&secret=${urlSecret}` : "&secret=YOUR_SECRET";
+  const tickerPart = urlTicker ? `&ticker=${urlTicker.toUpperCase()}` : "&ticker=BTCUSDT";
+
+  const buyUrl  = `${base}?action=buy${tickerPart}${secretPart}`;
+  const sellUrl = `${base}?action=sell${tickerPart}${secretPart}`;
 
   const doReset = async () => {
     setConfirm(false);
@@ -33,22 +64,44 @@ export default function Settings({ onReset }) {
 
   return (
     <div className="space-y-6 max-w-lg">
-      {/* Webhook URL */}
+
+      {/* ── URL 빌더 (메시지 불필요) ── */}
       <div>
-        <p className="label mb-2">웹훅 URL</p>
-        <div className="flex gap-2">
-          <code className="flex-1 bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-emerald-400 truncate">
-            {webhookUrl}
-          </code>
-          <button
-            onClick={() => copy(webhookUrl)}
-            className="px-3 py-2 text-xs bg-gray-800 hover:bg-gray-700 rounded-lg transition text-gray-300"
-          >복사</button>
+        <p className="label mb-1">URL 방식 웹훅</p>
+        <p className="text-xs text-gray-500 mb-3">
+          아래 URL을 TradingView 웹훅 URL 칸에 넣으면 알림 메시지를 비워도 자동으로 매수/매도됩니다.
+        </p>
+
+        <div className="flex gap-2 mb-3">
+          <input
+            value={urlTicker}
+            onChange={e => setUrlTicker(e.target.value.toUpperCase())}
+            placeholder="티커 (예: BTCUSDT)"
+            className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm
+                       focus:outline-none focus:ring-1 focus:ring-emerald-500 uppercase"
+          />
+          <input
+            value={urlSecret}
+            onChange={e => setUrlSecret(e.target.value)}
+            placeholder="웹훅 시크릿"
+            type="text"
+            className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm
+                       focus:outline-none focus:ring-1 focus:ring-emerald-500"
+          />
         </div>
+
+        <div className="space-y-2">
+          <CopyRow label="매수 URL (Buy)" url={buyUrl} color="text-emerald-400" />
+          <CopyRow label="매도 URL (Sell)" url={sellUrl} color="text-rose-400" />
+        </div>
+
+        <p className="text-xs text-gray-600 mt-2">
+          시크릿은 Render 대시보드 → Environment → WEBHOOK_SECRET 에서 확인하세요.
+        </p>
       </div>
 
-      {/* Parameters */}
-      <div>
+      {/* ── 매매 파라미터 ── */}
+      <div className="border-t border-gray-800 pt-5">
         <p className="label mb-3">매매 파라미터</p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {[
@@ -69,7 +122,7 @@ export default function Settings({ onReset }) {
         </div>
       </div>
 
-      {/* Reset */}
+      {/* ── 계좌 초기화 ── */}
       <div className="border-t border-gray-800 pt-5">
         {!confirm ? (
           <button
