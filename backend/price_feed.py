@@ -75,13 +75,19 @@ async def _fetch_kraken(client: httpx.AsyncClient, ticker: str) -> float | None:
 # ── Public API ────────────────────────────────────────────────────────────────
 
 async def fetch_prices(tickers: list[str]) -> dict[str, float]:
-    """Return {TICKER: price} trying Binance → Coinbase → Kraken per ticker."""
+    """Return {TICKER: price} trying Coinbase → Binance → Kraken per ticker.
+    Coinbase is first because Binance blocks US-region servers (Render)."""
     if not tickers:
         return {}
     prices: dict[str, float] = {}
     async with httpx.AsyncClient(timeout=10) as client:
         for ticker in tickers:
-            # 1. Binance
+            # 1. Coinbase (works from US/Render)
+            price = await _fetch_coinbase(client, ticker)
+            if price is not None:
+                prices[ticker] = price
+                continue
+            # 2. Binance (works outside US)
             try:
                 r = await client.get(BINANCE_TICKER_URL, params={"symbol": ticker})
                 r.raise_for_status()
@@ -89,11 +95,6 @@ async def fetch_prices(tickers: list[str]) -> dict[str, float]:
                 continue
             except Exception:
                 pass
-            # 2. Coinbase
-            price = await _fetch_coinbase(client, ticker)
-            if price is not None:
-                prices[ticker] = price
-                continue
             # 3. Kraken
             price = await _fetch_kraken(client, ticker)
             if price is not None:
@@ -104,9 +105,34 @@ async def fetch_prices(tickers: list[str]) -> dict[str, float]:
 
 
 async def fetch_24hr_stats(ticker: str) -> dict | None:
-    """Return 24-hour stats. Tries Binance first, then Kraken."""
+    """Return 24-hour stats. Tries Kraken first (reliable globally), then Binance."""
     async with httpx.AsyncClient(timeout=10) as client:
-        # 1. Binance
+        # 1. Kraken (works globally including US)
+        pair = _to_kraken_pair(ticker)
+        if pair:
+            try:
+                r = await client.get("https://api.kraken.com/0/public/Ticker",
+                                     params={"pair": pair}, timeout=8)
+                r.raise_for_status()
+                result = r.json().get("result", {})
+                if result:
+                    d = next(iter(result.values()))
+                    price = float(d["c"][0])
+                    open_ = float(d["o"])
+                    high  = float(d["h"][1])
+                    low   = float(d["l"][1])
+                    vol   = float(d["v"][1])
+                    change_pct = ((price - open_) / open_ * 100) if open_ else 0
+                    return {
+                        "price":      price,
+                        "change_pct": round(change_pct, 2),
+                        "high":       high,
+                        "low":        low,
+                        "volume":     vol * price,
+                    }
+            except Exception:
+                pass
+        # 2. Binance (fallback for non-US regions)
         try:
             r = await client.get(BINANCE_24H_URL, params={"symbol": ticker})
             r.raise_for_status()
@@ -120,31 +146,7 @@ async def fetch_24hr_stats(ticker: str) -> dict | None:
             }
         except Exception:
             pass
-        # 2. Kraken
-        pair = _to_kraken_pair(ticker)
-        if pair:
-            try:
-                r = await client.get("https://api.kraken.com/0/public/Ticker",
-                                     params={"pair": pair}, timeout=8)
-                r.raise_for_status()
-                result = r.json().get("result", {})
-                if result:
-                    d = next(iter(result.values()))
-                    price = float(d["c"][0])
-                    open_ = float(d["o"])
-                    high  = float(d["h"][1])  # 24h high
-                    low   = float(d["l"][1])  # 24h low
-                    vol   = float(d["v"][1])  # 24h volume in base currency
-                    change_pct = ((price - open_) / open_ * 100) if open_ else 0
-                    return {
-                        "price":      price,
-                        "change_pct": round(change_pct, 2),
-                        "high":       high,
-                        "low":        low,
-                        "volume":     vol * price,  # convert to quote volume
-                    }
-            except Exception as exc:
-                logger.warning("24hr stats fetch failed for %s: %s", ticker, exc)
+        logger.warning("All 24hr stat sources failed for %s", ticker)
         return None
 
 
