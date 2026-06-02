@@ -1,59 +1,155 @@
 """
-Binance public REST API price polling.
-No API key required — uses the public ticker endpoint.
+Price polling with multi-provider fallback.
+Primary: Binance public API (blocked in US/some regions → 451)
+Fallback: Coinbase, Kraken
 """
 import asyncio
 import logging
+import re
 from typing import Callable
 
 import httpx
 
 logger = logging.getLogger(__name__)
 
-BINANCE_TICKER_URL = "https://api.binance.com/api/v3/ticker/price"
-BINANCE_24H_URL = "https://api.binance.com/api/v3/ticker/24hr"
 POLL_INTERVAL = 5  # seconds
+
+# ── Provider URLs ─────────────────────────────────────────────────────────────
+
+BINANCE_TICKER_URL = "https://api.binance.com/api/v3/ticker/price"
+BINANCE_24H_URL    = "https://api.binance.com/api/v3/ticker/24hr"
+
+
+def _to_coinbase_pair(ticker: str) -> str | None:
+    """BTCUSDT → BTC-USD,  ETHBTC → ETH-BTC"""
+    m = re.match(r"^([A-Z]{2,6})(USDT|USDC|USD|BTC|ETH)$", ticker.upper())
+    if not m:
+        return None
+    base, quote = m.group(1), m.group(2)
+    quote = "USD" if quote in ("USDT", "USDC") else quote
+    return f"{base}-{quote}"
+
+
+def _to_kraken_pair(ticker: str) -> str | None:
+    """BTCUSDT → XBTUSD,  ETHUSDT → ETHUSD"""
+    m = re.match(r"^([A-Z]{2,6})(USDT|USDC|USD|BTC|ETH)$", ticker.upper())
+    if not m:
+        return None
+    base, quote = m.group(1), m.group(2)
+    base  = "XBT" if base  == "BTC" else base
+    quote = "USD" if quote in ("USDT", "USDC") else quote
+    return f"{base}{quote}"
+
+
+async def _fetch_coinbase(client: httpx.AsyncClient, ticker: str) -> float | None:
+    pair = _to_coinbase_pair(ticker)
+    if not pair:
+        return None
+    try:
+        r = await client.get(f"https://api.coinbase.com/v2/prices/{pair}/spot", timeout=8)
+        r.raise_for_status()
+        return float(r.json()["data"]["amount"])
+    except Exception as exc:
+        logger.debug("Coinbase fallback failed for %s: %s", ticker, exc)
+        return None
+
+
+async def _fetch_kraken(client: httpx.AsyncClient, ticker: str) -> float | None:
+    pair = _to_kraken_pair(ticker)
+    if not pair:
+        return None
+    try:
+        r = await client.get("https://api.kraken.com/0/public/Ticker",
+                             params={"pair": pair}, timeout=8)
+        r.raise_for_status()
+        result = r.json().get("result", {})
+        if not result:
+            return None
+        data = next(iter(result.values()))
+        return float(data["c"][0])  # last trade close price
+    except Exception as exc:
+        logger.debug("Kraken fallback failed for %s: %s", ticker, exc)
+        return None
+
+
+# ── Public API ────────────────────────────────────────────────────────────────
+
+async def fetch_prices(tickers: list[str]) -> dict[str, float]:
+    """Return {TICKER: price} trying Binance → Coinbase → Kraken per ticker."""
+    if not tickers:
+        return {}
+    prices: dict[str, float] = {}
+    async with httpx.AsyncClient(timeout=10) as client:
+        for ticker in tickers:
+            # 1. Binance
+            try:
+                r = await client.get(BINANCE_TICKER_URL, params={"symbol": ticker})
+                r.raise_for_status()
+                prices[ticker] = float(r.json()["price"])
+                continue
+            except Exception:
+                pass
+            # 2. Coinbase
+            price = await _fetch_coinbase(client, ticker)
+            if price is not None:
+                prices[ticker] = price
+                continue
+            # 3. Kraken
+            price = await _fetch_kraken(client, ticker)
+            if price is not None:
+                prices[ticker] = price
+                continue
+            logger.warning("All price sources failed for %s", ticker)
+    return prices
 
 
 async def fetch_24hr_stats(ticker: str) -> dict | None:
-    """Return 24-hour stats for a single ticker (price, change %, high, low, volume)."""
+    """Return 24-hour stats. Tries Binance first, then Kraken."""
     async with httpx.AsyncClient(timeout=10) as client:
+        # 1. Binance
         try:
-            resp = await client.get(BINANCE_24H_URL, params={"symbol": ticker})
-            resp.raise_for_status()
-            d = resp.json()
+            r = await client.get(BINANCE_24H_URL, params={"symbol": ticker})
+            r.raise_for_status()
+            d = r.json()
             return {
-                "price": float(d["lastPrice"]),
+                "price":      float(d["lastPrice"]),
                 "change_pct": float(d["priceChangePercent"]),
-                "high": float(d["highPrice"]),
-                "low": float(d["lowPrice"]),
-                "volume": float(d["quoteVolume"]),
+                "high":       float(d["highPrice"]),
+                "low":        float(d["lowPrice"]),
+                "volume":     float(d["quoteVolume"]),
             }
-        except Exception as exc:
-            logger.warning("24hr stats fetch failed for %s: %s", ticker, exc)
-            return None
-
-
-async def fetch_prices(tickers: list[str]) -> dict[str, float]:
-    """Return {TICKER: price} for each ticker using Binance public API."""
-    if not tickers:
-        return {}
-    async with httpx.AsyncClient(timeout=10) as client:
-        prices: dict[str, float] = {}
-        for ticker in tickers:
+        except Exception:
+            pass
+        # 2. Kraken
+        pair = _to_kraken_pair(ticker)
+        if pair:
             try:
-                resp = await client.get(BINANCE_TICKER_URL, params={"symbol": ticker})
-                resp.raise_for_status()
-                data = resp.json()
-                prices[ticker] = float(data["price"])
+                r = await client.get("https://api.kraken.com/0/public/Ticker",
+                                     params={"pair": pair}, timeout=8)
+                r.raise_for_status()
+                result = r.json().get("result", {})
+                if result:
+                    d = next(iter(result.values()))
+                    price = float(d["c"][0])
+                    open_ = float(d["o"])
+                    high  = float(d["h"][1])  # 24h high
+                    low   = float(d["l"][1])  # 24h low
+                    vol   = float(d["v"][1])  # 24h volume in base currency
+                    change_pct = ((price - open_) / open_ * 100) if open_ else 0
+                    return {
+                        "price":      price,
+                        "change_pct": round(change_pct, 2),
+                        "high":       high,
+                        "low":        low,
+                        "volume":     vol * price,  # convert to quote volume
+                    }
             except Exception as exc:
-                logger.warning("Price fetch failed for %s: %s", ticker, exc)
-        return prices
+                logger.warning("24hr stats fetch failed for %s: %s", ticker, exc)
+        return None
 
 
 class PriceFeedService:
-    """Background service that periodically polls Binance prices
-    and invokes a callback with the latest price map."""
+    """Background service that polls prices and invokes a callback."""
 
     def __init__(self, get_tickers: Callable[[], list[str]],
                  on_prices: Callable[[dict[str, float]], None]):
