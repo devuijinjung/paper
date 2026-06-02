@@ -84,7 +84,7 @@ export default function App() {
   const connected = wsStatus === "연결됨";
 
   return (
-    <div className="min-h-screen p-4 md:p-6 max-w-7xl mx-auto">
+    <div className="min-h-screen p-3 sm:p-4 md:p-6 max-w-7xl mx-auto">
       {/* ── Header ── */}
       <header className="flex items-center justify-between mb-5">
         <div>
@@ -104,18 +104,20 @@ export default function App() {
       <Stats     stats={stats} />
 
       {/* ── Tabs ── */}
-      <div className="flex gap-1 mb-4 border-b border-gray-800 pb-2">
-        {TABS.map((t, i) => (
-          <button key={t} onClick={() => handleTab(i)}
-            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition ${
-              tab === i ? "bg-emerald-600 text-white" : "text-gray-500 hover:text-white hover:bg-gray-800"
-            }`}>
-            {t}
-          </button>
-        ))}
+      <div className="mb-4 border-b border-gray-800">
+        <div className="flex gap-1 pb-2 overflow-x-auto">
+          {TABS.map((t, i) => (
+            <button key={t} onClick={() => handleTab(i)}
+              className={`flex-shrink-0 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition ${
+                tab === i ? "bg-emerald-600 text-white" : "text-gray-500 hover:text-white hover:bg-gray-800"
+              }`}>
+              {t}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <div className="card p-5 min-h-48">
+      <div className="card p-3 sm:p-5 min-h-48">
         {tab === 0 && <Positions  positions={portfolio?.positions} streamPrices={streamPrices} />}
         {tab === 1 && <Trades     trades={trades} />}
         {tab === 2 && <EquityCurve history={portfolio?.balance_history} />}

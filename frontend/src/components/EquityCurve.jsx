@@ -56,7 +56,7 @@ export default function EquityCurve({ history }) {
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
             <XAxis dataKey="ts" tick={{ fill: "#4b5563", fontSize: 10 }} minTickGap={50} />
-            <YAxis tick={{ fill: "#4b5563", fontSize: 10 }} width={72} tickFormatter={fmt} />
+            <YAxis tick={{ fill: "#4b5563", fontSize: 10 }} width={56} tickFormatter={fmt} />
             {initialEquity && (
               <ReferenceLine y={initialEquity} stroke="#374151" strokeDasharray="4 4"
                 label={{ value: "원금", fill: "#4b5563", fontSize: 10, position: "insideTopLeft" }} />
@@ -82,7 +82,7 @@ export default function EquityCurve({ history }) {
           <ComposedChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
             <XAxis dataKey="ts" tick={{ fill: "#4b5563", fontSize: 10 }} minTickGap={50} />
-            <YAxis tick={{ fill: "#4b5563", fontSize: 10 }} width={42}
+            <YAxis tick={{ fill: "#4b5563", fontSize: 10 }} width={34}
               tickFormatter={v => `${v.toFixed(0)}%`} />
             <Tooltip
               contentStyle={{ background: "#111827", border: "1px solid #374151", borderRadius: 8 }}

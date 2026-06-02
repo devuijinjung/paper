@@ -3,9 +3,9 @@ import { useFlash } from "../useFlash";
 function StatCard({ label, value, sub, color }) {
   const flash = useFlash(typeof value === "number" ? value : 0);
   return (
-    <div className="card p-4">
+    <div className="card p-3 sm:p-4">
       <p className="label mb-2">{label}</p>
-      <p className={`text-lg font-bold tabular-nums ${color ?? "text-white"} ${flash}`}>{value}</p>
+      <p className={`text-base sm:text-lg font-bold tabular-nums ${color ?? "text-white"} ${flash}`}>{value}</p>
       {sub && <p className="text-xs text-gray-500 mt-0.5">{sub}</p>}
     </div>
   );

@@ -48,7 +48,7 @@ export default function AlertLogs({ logs }) {
     return <div className="flex items-center justify-center h-32 text-gray-600">수신된 알림 없음</div>;
 
   return (
-    <div className="space-y-2 max-h-[480px] overflow-y-auto pr-1">
+    <div className="space-y-2 max-h-[60vh] md:max-h-[480px] overflow-y-auto pr-1">
       {logs.map(log => <LogEntry key={log.id} log={log} />)}
     </div>
   );

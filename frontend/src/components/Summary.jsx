@@ -4,9 +4,9 @@ import { useFlash } from "../useFlash";
 function Card({ label, value, color, flash }) {
   const cls = useFlash(flash ?? 0);
   return (
-    <div className="card p-4">
+    <div className="card p-3 sm:p-4">
       <p className="label mb-2">{label}</p>
-      <p className={`text-xl font-bold tabular-nums ${color ?? "text-white"} ${cls}`}>{value}</p>
+      <p className={`text-lg sm:text-xl font-bold tabular-nums ${color ?? "text-white"} ${cls}`}>{value}</p>
     </div>
   );
 }
