@@ -94,17 +94,14 @@ export default function Settings({ onReset }) {
 
         <CopyRow label="웹훅 URL (매수·매도 공용)" url={`${base}?ticker=${urlTicker || "BTCUSDT"}${secretPart}`} />
 
-        <div className="mt-3 bg-gray-950 border border-gray-800 rounded-lg p-3 text-xs space-y-1.5">
-          <p className="text-gray-500 font-medium">TradingView 알림 메시지 설정</p>
-          <div className="flex gap-3">
-            <span className="text-gray-600">매수 알림:</span>
-            <code className="text-emerald-400">buy</code>
+        <div className="mt-3 bg-gray-950 border border-gray-800 rounded-lg p-3 text-xs space-y-2">
+          <p className="text-gray-500 font-medium">알림 메시지 — 아무거나 OK</p>
+          <div className="space-y-1 text-gray-600">
+            <p>✓ 기본 메시지 그대로 사용 가능</p>
+            <p>✓ <code className="text-gray-400">buy</code> / <code className="text-gray-400">sell</code> 한 단어만 입력</p>
+            <p>✓ <code className="text-gray-400">long</code> / <code className="text-gray-400">short</code> / <code className="text-gray-400">close</code> 등 키워드 포함</p>
           </div>
-          <div className="flex gap-3">
-            <span className="text-gray-600">매도 알림:</span>
-            <code className="text-rose-400">sell</code>
-          </div>
-          <p className="text-gray-700 pt-1">long / short / close 등 다른 키워드도 사용 가능</p>
+          <p className="text-gray-700">메시지 어디에 있든 buy/sell 키워드와 티커를 자동 추출합니다.</p>
         </div>
 
         <p className="text-xs text-gray-600 mt-2">

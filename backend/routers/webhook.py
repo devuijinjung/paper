@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -9,12 +10,39 @@ from config import settings
 from database import get_db
 from models import AlertLog
 from price_feed import fetch_prices
-from schemas import WebhookPayload
+from schemas import WebhookPayload, _ACTION_ALIASES
 from trading_engine import engine, InsufficientFundsError, NoPositionError
 from ws_manager import manager
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+def _parse_text_body(text: str) -> dict:
+    """Extract trading fields from any plain-text TradingView alert message.
+
+    Works with the default strategy message format:
+      '오더 buy @ 0.001 필드 온 BTCUSDT. 뉴 스트래티지 포지션은 0.001'
+    or a simple keyword like 'buy' / 'sell'.
+    """
+    result = {}
+    # Action: first recognized alias found in the text
+    for word in re.findall(r"\b\w+\b", text.lower()):
+        if word in _ACTION_ALIASES:
+            result["action"] = word
+            break
+    # Ticker: common crypto/stock pair pattern (BTCUSDT, ETHBTC, etc.)
+    m = re.search(r"\b([A-Z]{2,6}(?:USDT|BTC|ETH|BUSD|USD|EUR|GBP|KRW))\b", text.upper())
+    if m:
+        result["ticker"] = m.group(1)
+    # Quantity: number after "@"  ({{strategy.order.contracts}})
+    m = re.search(r"@\s*([\d.]+)", text)
+    if m:
+        try:
+            result["quantity"] = float(m.group(1))
+        except ValueError:
+            pass
+    return result
 
 
 async def _get_exec_price(payload: WebhookPayload) -> float:
@@ -34,7 +62,7 @@ async def receive_webhook(
     q_ticker: Optional[str] = Query(None, alias="ticker"),
     q_secret: Optional[str] = Query(None, alias="secret"),
 ):
-    # Parse body: try JSON first, then plain text (treated as action)
+    # Parse body: try JSON first, then extract fields from plain text
     try:
         payload: dict[str, Any] = await request.json()
         if not isinstance(payload, dict):
@@ -42,7 +70,7 @@ async def receive_webhook(
     except Exception:
         try:
             text = (await request.body()).decode().strip()
-            payload = {"action": text} if text else {}
+            payload = _parse_text_body(text) if text else {}
         except Exception:
             payload = {}
 
