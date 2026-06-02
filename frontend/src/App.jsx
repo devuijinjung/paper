@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useWebSocket } from "./useWebSocket";
 import Summary from "./components/Summary";
 import Positions from "./components/Positions";
@@ -21,12 +21,17 @@ async function fetchAll() {
   return { portfolio, trades, alerts };
 }
 
+async function fetchAlerts() {
+  return fetch("/api/alerts").then((r) => r.json());
+}
+
 export default function App() {
   const [portfolio, setPortfolio] = useState(null);
   const [trades, setTrades] = useState([]);
   const [alerts, setAlerts] = useState([]);
   const [tab, setTab] = useState(0);
   const [wsStatus, setWsStatus] = useState("연결 중...");
+  const alertPollRef = useRef(null);
 
   const load = useCallback(async () => {
     try {
@@ -41,6 +46,17 @@ export default function App() {
 
   useEffect(() => { load(); }, [load]);
 
+  // Poll alerts every 10 s while the alert-log tab is active
+  useEffect(() => {
+    if (tab === 3) {
+      fetchAlerts().then(setAlerts).catch(() => {});
+      alertPollRef.current = setInterval(() => {
+        fetchAlerts().then(setAlerts).catch(() => {});
+      }, 10000);
+    }
+    return () => clearInterval(alertPollRef.current);
+  }, [tab]);
+
   const onWsMessage = useCallback((msg) => {
     if (msg.summary) {
       setPortfolio((prev) => prev ? { ...prev, ...msg.summary } : msg.summary);
@@ -49,7 +65,6 @@ export default function App() {
       setPortfolio((prev) => prev ? { ...prev, positions: msg.positions } : prev);
     }
     if (msg.type === "trade") {
-      // Refresh trade list and alerts after a new trade
       load();
     }
   }, [load]);
@@ -57,6 +72,13 @@ export default function App() {
   const onWsOpen = useCallback(() => setWsStatus("연결됨"), []);
 
   useWebSocket(WS_URL, onWsMessage, onWsOpen);
+
+  const handleTabChange = (i) => {
+    setTab(i);
+    // Immediately refresh relevant data on tab switch
+    if (i === 3) fetchAlerts().then(setAlerts).catch(() => {});
+    if (i === 1) fetch("/api/trades").then((r) => r.json()).then(setTrades).catch(() => {});
+  };
 
   return (
     <div className="min-h-screen p-4 md:p-8 max-w-6xl mx-auto">
@@ -78,7 +100,7 @@ export default function App() {
         {TABS.map((t, i) => (
           <button
             key={t}
-            onClick={() => setTab(i)}
+            onClick={() => handleTabChange(i)}
             className={`px-4 py-1.5 rounded-lg text-sm font-medium transition ${
               tab === i
                 ? "bg-emerald-600 text-white"

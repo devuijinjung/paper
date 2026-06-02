@@ -29,16 +29,12 @@ async def _get_exec_price(payload: WebhookPayload) -> float:
 @router.post("/webhook")
 async def receive_webhook(payload: dict[str, Any], db: AsyncSession = Depends(get_db)):
     raw = json.dumps(payload)
-    status = "ok"
-    parsed_result = None
 
     try:
-        # Validate secret first to avoid logging payload on auth failure
         secret = payload.get("secret", "")
         if secret != settings.webhook_secret:
-            log = AlertLog(raw_payload=raw, status="rejected",
-                           parsed_result="invalid secret")
-            db.add(log)
+            db.add(AlertLog(raw_payload=raw, status="rejected",
+                            parsed_result="invalid secret"))
             await db.commit()
             raise HTTPException(401, "Invalid webhook secret")
 
@@ -55,53 +51,40 @@ async def receive_webhook(payload: dict[str, Any], db: AsyncSession = Depends(ge
                 db, parsed.ticker, exec_price,
                 parsed.order_size_pct, parsed.quantity, parsed.strategy,
             )
-        else:  # close
+        else:
             trade = await engine.execute_close(
                 db, parsed.ticker, exec_price, parsed.strategy
             )
 
-        parsed_result = json.dumps({
+        result = {
             "trade_id": trade.id,
             "side": trade.side,
             "price": trade.price,
             "qty": trade.qty,
             "fee": trade.fee,
             "realized_pnl": trade.realized_pnl,
-        })
+        }
 
+        # Write alert log in the same transaction as the trade
+        db.add(AlertLog(raw_payload=raw, status="ok",
+                        parsed_result=json.dumps(result)))
         await db.commit()
 
-        # Push live update to WebSocket clients
         summary = await engine.get_portfolio_summary(db)
-        await manager.broadcast({"type": "trade", "summary": summary,
-                                  "trade": json.loads(parsed_result)})
+        await manager.broadcast({"type": "trade", "summary": summary, "trade": result})
 
-        return {"status": "ok", "trade": json.loads(parsed_result)}
+        return {"status": "ok", "trade": result}
 
     except HTTPException:
         raise
     except (InsufficientFundsError, NoPositionError) as exc:
-        status = "error"
-        parsed_result = str(exc)
         await db.rollback()
-        log = AlertLog(raw_payload=raw, status=status, parsed_result=parsed_result)
-        db.add(log)
+        db.add(AlertLog(raw_payload=raw, status="error", parsed_result=str(exc)))
         await db.commit()
         raise HTTPException(422, str(exc))
     except Exception as exc:
-        status = "error"
-        parsed_result = str(exc)
         await db.rollback()
         logger.exception("Webhook processing error")
-        log = AlertLog(raw_payload=raw, status=status, parsed_result=parsed_result)
-        db.add(log)
+        db.add(AlertLog(raw_payload=raw, status="error", parsed_result=str(exc)))
         await db.commit()
         raise HTTPException(500, "Internal server error")
-    finally:
-        if status == "ok":
-            log = AlertLog(raw_payload=raw, status=status, parsed_result=parsed_result)
-            db.add(log)
-            try:
-                await db.commit()
-            except Exception:
-                pass
