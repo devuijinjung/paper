@@ -11,7 +11,27 @@ import httpx
 logger = logging.getLogger(__name__)
 
 BINANCE_TICKER_URL = "https://api.binance.com/api/v3/ticker/price"
+BINANCE_24H_URL = "https://api.binance.com/api/v3/ticker/24hr"
 POLL_INTERVAL = 5  # seconds
+
+
+async def fetch_24hr_stats(ticker: str) -> dict | None:
+    """Return 24-hour stats for a single ticker (price, change %, high, low, volume)."""
+    async with httpx.AsyncClient(timeout=10) as client:
+        try:
+            resp = await client.get(BINANCE_24H_URL, params={"symbol": ticker})
+            resp.raise_for_status()
+            d = resp.json()
+            return {
+                "price": float(d["lastPrice"]),
+                "change_pct": float(d["priceChangePercent"]),
+                "high": float(d["highPrice"]),
+                "low": float(d["lowPrice"]),
+                "volume": float(d["quoteVolume"]),
+            }
+        except Exception as exc:
+            logger.warning("24hr stats fetch failed for %s: %s", ticker, exc)
+            return None
 
 
 async def fetch_prices(tickers: list[str]) -> dict[str, float]:

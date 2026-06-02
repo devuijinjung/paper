@@ -5,3 +5,14 @@
 body {
   @apply bg-gray-950 text-gray-100;
 }
+
+@keyframes flash-up {
+  0%   { color: #34d399; text-shadow: 0 0 8px #34d39966; }
+  100% { color: inherit; text-shadow: none; }
+}
+@keyframes flash-down {
+  0%   { color: #fb7185; text-shadow: 0 0 8px #fb718566; }
+  100% { color: inherit; text-shadow: none; }
+}
+.flash-up   { animation: flash-up   0.9s ease-out; }
+.flash-down { animation: flash-down 0.9s ease-out; }

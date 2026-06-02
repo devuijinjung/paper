@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useWebSocket } from "./useWebSocket";
 import Summary from "./components/Summary";
+import LiveTicker from "./components/LiveTicker";
 import Positions from "./components/Positions";
 import Trades from "./components/Trades";
 import EquityCurve from "./components/EquityCurve";
@@ -29,6 +30,7 @@ export default function App() {
   const [portfolio, setPortfolio] = useState(null);
   const [trades, setTrades] = useState([]);
   const [alerts, setAlerts] = useState([]);
+  const [market, setMarket] = useState(null);
   const [tab, setTab] = useState(0);
   const [wsStatus, setWsStatus] = useState("연결 중...");
   const alertPollRef = useRef(null);
@@ -58,15 +60,14 @@ export default function App() {
   }, [tab]);
 
   const onWsMessage = useCallback((msg) => {
+    if (msg.market) setMarket(msg.market);
     if (msg.summary) {
       setPortfolio((prev) => prev ? { ...prev, ...msg.summary } : msg.summary);
     }
     if (msg.positions) {
       setPortfolio((prev) => prev ? { ...prev, positions: msg.positions } : prev);
     }
-    if (msg.type === "trade") {
-      load();
-    }
+    if (msg.type === "trade") load();
   }, [load]);
 
   const onWsOpen = useCallback(() => setWsStatus("연결됨"), []);
@@ -75,25 +76,30 @@ export default function App() {
 
   const handleTabChange = (i) => {
     setTab(i);
-    // Immediately refresh relevant data on tab switch
     if (i === 3) fetchAlerts().then(setAlerts).catch(() => {});
     if (i === 1) fetch("/api/trades").then((r) => r.json()).then(setTrades).catch(() => {});
   };
 
   return (
     <div className="min-h-screen p-4 md:p-8 max-w-6xl mx-auto">
-      <header className="flex items-center justify-between mb-6">
+      <header className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Paper Trading</h1>
           <p className="text-xs text-gray-500 mt-0.5">TradingView 웹훅 기반 모의매매</p>
         </div>
         <span className={`text-xs px-3 py-1 rounded-full font-medium ${
-          wsStatus === "연결됨" ? "bg-emerald-900 text-emerald-300" : "bg-gray-700 text-gray-400"
+          wsStatus === "연결됨"
+            ? "bg-emerald-900 text-emerald-300"
+            : "bg-gray-700 text-gray-400"
         }`}>
           WS {wsStatus}
         </span>
       </header>
 
+      {/* 실시간 BTC 시세 티커 */}
+      <LiveTicker market={market} />
+
+      {/* 포트폴리오 요약 카드 */}
       <Summary portfolio={portfolio} />
 
       <nav className="flex gap-1 mb-4 border-b border-gray-800 pb-2">
