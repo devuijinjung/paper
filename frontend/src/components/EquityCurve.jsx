@@ -3,17 +3,16 @@ import {
   Tooltip, ResponsiveContainer, ReferenceLine, Brush,
 } from "recharts";
 import { useMemo } from "react";
+import { fmtKrwCompact } from "../fmt";
 
-const fmt = (v) => `$${Number(v).toLocaleString("en",{minimumFractionDigits:0,maximumFractionDigits:0})}`;
-
-function CustomTooltip({ active, payload, label }) {
+function CustomTooltip({ active, payload, label, rate }) {
   if (!active || !payload?.length) return null;
   const eq = payload.find(p => p.dataKey === "equity");
   const dd = payload.find(p => p.dataKey === "drawdown");
   return (
     <div className="bg-gray-900 border border-gray-700 rounded-xl p-3 text-xs shadow-xl">
       <p className="text-gray-400 mb-1">{label}</p>
-      {eq && <p className="text-emerald-400 font-semibold">{fmt(eq.value)}</p>}
+      {eq && <p className="text-emerald-400 font-semibold">{fmtKrwCompact(eq.value, rate)}</p>}
       {dd && <p className={`font-medium ${dd.value < -5 ? "text-rose-400" : "text-gray-400"}`}>
         낙폭 {dd.value.toFixed(2)}%
       </p>}
@@ -21,7 +20,7 @@ function CustomTooltip({ active, payload, label }) {
   );
 }
 
-export default function EquityCurve({ history }) {
+export default function EquityCurve({ history, rate }) {
   const data = useMemo(() => {
     if (!history?.length) return [];
     let peak = 0;
@@ -37,6 +36,7 @@ export default function EquityCurve({ history }) {
   }, [history]);
 
   const initialEquity = data[0]?.equity;
+  const fmtY = (v) => fmtKrwCompact(v, rate);
 
   if (!data.length)
     return <div className="flex items-center justify-center h-48 text-gray-600">데이터 없음</div>;
@@ -56,12 +56,12 @@ export default function EquityCurve({ history }) {
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
             <XAxis dataKey="ts" tick={{ fill: "#4b5563", fontSize: 10 }} minTickGap={50} />
-            <YAxis tick={{ fill: "#4b5563", fontSize: 10 }} width={56} tickFormatter={fmt} />
+            <YAxis tick={{ fill: "#4b5563", fontSize: 10 }} width={56} tickFormatter={fmtY} />
             {initialEquity && (
               <ReferenceLine y={initialEquity} stroke="#374151" strokeDasharray="4 4"
                 label={{ value: "원금", fill: "#4b5563", fontSize: 10, position: "insideTopLeft" }} />
             )}
-            <Tooltip content={<CustomTooltip />} />
+            <Tooltip content={<CustomTooltip rate={rate} />} />
             <Area type="monotone" dataKey="equity" stroke="#10b981"
               strokeWidth={2} fill="url(#eq)" dot={false} />
             {data.length > 5 && (

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { fmtKrw } from "../fmt";
 
 function CopyRow({ label, url, color = "text-emerald-400" }) {
   const [copied, setCopied] = useState(false);
@@ -23,7 +24,7 @@ function CopyRow({ label, url, color = "text-emerald-400" }) {
   );
 }
 
-function TestTrade({ onDone }) {
+function TestTrade({ onDone, rate }) {
   const [ticker,  setTicker]  = useState("BTCUSDT");
   const [secret,  setSecret]  = useState("");
   const [result,  setResult]  = useState(null);
@@ -41,7 +42,9 @@ function TestTrade({ onDone }) {
       );
       const data = await res.json();
       if (res.ok) {
-        setResult({ ok: true, msg: `✓ ${action === "buy" ? "매수" : action === "sell" ? "매도" : "청산"} 체결: $${data.trade?.price?.toLocaleString("en", { minimumFractionDigits: 2 })}` });
+        const label = action === "buy" ? "매수" : action === "sell" ? "매도" : "청산";
+        const priceKrw = fmtKrw(data.trade?.price, rate);
+        setResult({ ok: true, msg: `✓ ${label} 체결: ${priceKrw}` });
         onDone?.();
       } else {
         setResult({ ok: false, msg: data.detail ?? "오류 발생" });
@@ -87,8 +90,8 @@ function TestTrade({ onDone }) {
   );
 }
 
-export default function Settings({ onReset, onTrade }) {
-  const [capital,   setCapital]   = useState("10000");
+export default function Settings({ onReset, onTrade, rate }) {
+  const [capital,   setCapital]   = useState(() => String(Math.round(10000 * rate)));
   const [fee,       setFee]       = useState("0.001");
   const [slip,      setSlip]      = useState("0.0005");
   const [msg,       setMsg]       = useState(null);
@@ -101,10 +104,6 @@ export default function Settings({ onReset, onTrade }) {
   const origin     = window.location.origin;
   const base       = `${origin}/webhook`;
   const secretPart = urlSecret ? `&secret=${urlSecret}` : "&secret=YOUR_SECRET";
-  const tickerPart = urlTicker ? `&ticker=${urlTicker.toUpperCase()}` : "&ticker=BTCUSDT";
-
-  const buyUrl  = `${base}?action=buy${tickerPart}${secretPart}`;
-  const sellUrl = `${base}?action=sell${tickerPart}${secretPart}`;
 
   const doReset = async () => {
     setConfirm(false);
@@ -113,7 +112,7 @@ export default function Settings({ onReset, onTrade }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          initial_capital: parseFloat(capital),
+          initial_capital: parseFloat(capital) / rate,
           fee_rate:        parseFloat(fee),
           slippage:        parseFloat(slip),
         }),
@@ -175,28 +174,40 @@ export default function Settings({ onReset, onTrade }) {
 
       {/* ── 수동 테스트 ── */}
       <div className="border-t border-gray-800 pt-5">
-        <TestTrade onDone={onTrade} />
+        <TestTrade onDone={onTrade} rate={rate} />
       </div>
 
       {/* ── 매매 파라미터 ── */}
       <div className="border-t border-gray-800 pt-5">
         <p className="label mb-3">매매 파라미터</p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {[
-            { label: "초기 자본 ($)", value: capital, set: setCapital, step: "1000" },
-            { label: "수수료율",       value: fee,     set: setFee,     step: "0.0001" },
-            { label: "슬리피지",       value: slip,    set: setSlip,    step: "0.0001" },
-          ].map(({ label, value, set, step }) => (
-            <label key={label} className="block">
-              <span className="text-xs text-gray-500">{label}</span>
-              <input
-                type="number" step={step} value={value}
-                onChange={e => set(e.target.value)}
-                className="mt-1 w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm
-                           focus:outline-none focus:ring-1 focus:ring-emerald-500"
-              />
-            </label>
-          ))}
+          <label className="block">
+            <span className="text-xs text-gray-500">초기 자본 (₩)</span>
+            <input
+              type="number" step="1000000" value={capital}
+              onChange={e => setCapital(e.target.value)}
+              className="mt-1 w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm
+                         focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            />
+          </label>
+          <label className="block">
+            <span className="text-xs text-gray-500">수수료율</span>
+            <input
+              type="number" step="0.0001" value={fee}
+              onChange={e => setFee(e.target.value)}
+              className="mt-1 w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm
+                         focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            />
+          </label>
+          <label className="block">
+            <span className="text-xs text-gray-500">슬리피지</span>
+            <input
+              type="number" step="0.0001" value={slip}
+              onChange={e => setSlip(e.target.value)}
+              className="mt-1 w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm
+                         focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            />
+          </label>
         </div>
       </div>
 

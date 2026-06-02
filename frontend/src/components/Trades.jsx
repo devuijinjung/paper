@@ -1,8 +1,9 @@
 import { useState } from "react";
+import { fmtKrw } from "../fmt";
 
 const PAGE = 20;
 
-function MobileCard({ t }) {
+function MobileCard({ t, rate }) {
   const pnlPos = t.realized_pnl >= 0;
   return (
     <div className="card p-3 text-xs space-y-1.5">
@@ -16,18 +17,18 @@ function MobileCard({ t }) {
         </span>
       </div>
       <div className="flex items-center justify-between">
-        <span className="text-gray-400 tabular-nums">${t.price.toLocaleString("en",{minimumFractionDigits:2})}</span>
+        <span className="text-gray-400 tabular-nums">{fmtKrw(t.price, rate)}</span>
         <span className={`font-semibold tabular-nums ${
           t.realized_pnl === 0 ? "text-gray-600" : pnlPos ? "val-pos" : "val-neg"
         }`}>
-          {t.realized_pnl === 0 ? "—" : `${pnlPos?"+":""}$${Math.abs(t.realized_pnl).toFixed(2)}`}
+          {t.realized_pnl === 0 ? "—" : fmtKrw(t.realized_pnl, rate, pnlPos)}
         </span>
       </div>
     </div>
   );
 }
 
-export default function Trades({ trades }) {
+export default function Trades({ trades, rate }) {
   const [page, setPage] = useState(0);
 
   if (!trades?.length)
@@ -44,13 +45,13 @@ export default function Trades({ trades }) {
       <div className="flex items-center justify-between px-1 text-sm">
         <span className="text-gray-500">총 {trades.length}건</span>
         <span className={`font-semibold tabular-nums ${totalPnl >= 0 ? "val-pos" : "val-neg"}`}>
-          실현손익 {totalPnl >= 0 ? "+" : ""}${totalPnl.toFixed(2)}
+          실현손익 {fmtKrw(totalPnl, rate, totalPnl >= 0)}
         </span>
       </div>
 
       {/* Mobile: cards */}
       <div className="space-y-2 md:hidden">
-        {slice.map(t => <MobileCard key={t.id} t={t} />)}
+        {slice.map(t => <MobileCard key={t.id} t={t} rate={rate} />)}
       </div>
 
       {/* Desktop: table */}
@@ -77,15 +78,14 @@ export default function Trades({ trades }) {
                   }`}>
                     {t.side === "buy" ? "매수" : "매도"}
                   </td>
-                  <td className="py-2.5 pr-4 tabular-nums">${t.price.toLocaleString("en",{minimumFractionDigits:2})}</td>
+                  <td className="py-2.5 pr-4 tabular-nums">{fmtKrw(t.price, rate)}</td>
                   <td className="py-2.5 pr-4 tabular-nums text-gray-400">{t.qty.toFixed(6)}</td>
-                  <td className="py-2.5 pr-4 tabular-nums text-gray-500">${t.fee.toFixed(3)}</td>
+                  <td className="py-2.5 pr-4 tabular-nums text-gray-500">{fmtKrw(t.fee, rate)}</td>
                   <td className={`py-2.5 pr-4 tabular-nums font-medium ${
                     t.realized_pnl === 0 ? "text-gray-600"
                     : pnlPos ? "val-pos" : "val-neg"
                   }`}>
-                    {t.realized_pnl === 0 ? "—"
-                      : `${pnlPos?"+":""}$${Math.abs(t.realized_pnl).toFixed(2)}`}
+                    {t.realized_pnl === 0 ? "—" : fmtKrw(t.realized_pnl, rate, pnlPos)}
                   </td>
                   <td className="py-2.5 text-gray-600 text-xs">{t.strategy ?? "—"}</td>
                 </tr>

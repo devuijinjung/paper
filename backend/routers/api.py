@@ -1,3 +1,6 @@
+import time as _time
+
+import httpx
 from fastapi import APIRouter, Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,6 +16,29 @@ from schemas import (
 from trading_engine import engine
 
 router = APIRouter(prefix="/api")
+
+_fx_cache = {"rate": 1350.0, "ts": 0.0}
+_FX_TTL = 60.0
+
+
+@router.get("/exchange-rate")
+async def get_exchange_rate():
+    now = _time.monotonic()
+    if now - _fx_cache["ts"] < _FX_TTL:
+        return {"usd_to_krw": _fx_cache["rate"]}
+    try:
+        async with httpx.AsyncClient(timeout=8) as client:
+            r = await client.get(
+                "https://api.coinbase.com/v2/exchange-rates",
+                params={"currency": "USD"},
+            )
+            r.raise_for_status()
+            rate = float(r.json()["data"]["rates"]["KRW"])
+            _fx_cache["rate"] = rate
+            _fx_cache["ts"] = now
+    except Exception:
+        pass
+    return {"usd_to_krw": _fx_cache["rate"]}
 
 
 @router.get("/portfolio", response_model=PortfolioOut)

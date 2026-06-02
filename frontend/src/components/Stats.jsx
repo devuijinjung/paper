@@ -1,4 +1,5 @@
 import { useFlash } from "../useFlash";
+import { fmtKrw } from "../fmt";
 
 function StatCard({ label, value, sub, color }) {
   const flash = useFlash(typeof value === "number" ? value : 0);
@@ -11,21 +12,18 @@ function StatCard({ label, value, sub, color }) {
   );
 }
 
-export default function Stats({ stats }) {
+export default function Stats({ stats, rate }) {
   if (!stats) return null;
   const {
     total_trades, closed_trades, win_count, loss_count,
     total_pnl, avg_win, avg_loss, profit_factor,
-    max_drawdown_pct, total_fees, open_positions,
+    max_drawdown_pct, total_fees,
   } = stats;
 
   const pnlPos  = total_pnl >= 0;
   const ddColor = max_drawdown_pct <= -10 ? "text-rose-400"
                 : max_drawdown_pct <= -5  ? "text-yellow-400"
                 : "text-gray-300";
-
-  const fmt = (n, prefix = "$") =>
-    `${n >= 0 ? prefix : "-" + prefix}${Math.abs(n).toLocaleString("en", { minimumFractionDigits: 2 })}`;
 
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
@@ -36,18 +34,18 @@ export default function Stats({ stats }) {
       />
       <StatCard
         label="총 실현손익"
-        value={fmt(total_pnl)}
+        value={fmtKrw(total_pnl, rate)}
         color={pnlPos ? "val-pos" : "val-neg"}
         sub={`승 ${win_count} / 패 ${loss_count}`}
       />
       <StatCard
         label="평균 수익"
-        value={avg_win ? fmt(avg_win) : "-"}
+        value={avg_win ? fmtKrw(avg_win, rate) : "-"}
         color="val-pos"
       />
       <StatCard
         label="평균 손실"
-        value={avg_loss ? fmt(avg_loss) : "-"}
+        value={avg_loss ? fmtKrw(avg_loss, rate) : "-"}
         color={avg_loss < 0 ? "val-neg" : "text-gray-300"}
       />
       <StatCard
@@ -60,7 +58,7 @@ export default function Stats({ stats }) {
         label="최대 낙폭"
         value={`${max_drawdown_pct.toFixed(2)}%`}
         color={ddColor}
-        sub={`수수료 합계 ${fmt(total_fees)}`}
+        sub={`수수료 합계 ${fmtKrw(total_fees, rate)}`}
       />
     </div>
   );

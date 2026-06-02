@@ -85,8 +85,8 @@ class TradingEngine:
             spend = cash * (order_size_pct / 100.0)
             qty = spend / exec_price
         else:
-            # Default: use 10 % of cash
-            qty = (cash * 0.10) / exec_price
+            # Default: use 100% of cash (reserve margin for fee)
+            qty = cash / (exec_price * (1 + self.fee_rate))
 
         cost = exec_price * qty
         fee = cost * self.fee_rate

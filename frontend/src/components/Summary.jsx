@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { useFlash } from "../useFlash";
+import { fmtKrw } from "../fmt";
 
 function Card({ label, value, color, flash }) {
   const cls = useFlash(flash ?? 0);
@@ -11,7 +12,7 @@ function Card({ label, value, color, flash }) {
   );
 }
 
-export default function Summary({ portfolio, streamPrices }) {
+export default function Summary({ portfolio, streamPrices, rate }) {
   if (!portfolio) return null;
   const { cash, equity: dbEquity, total_return_pct: dbRet, win_rate, positions } = portfolio;
 
@@ -29,8 +30,8 @@ export default function Summary({ portfolio, streamPrices }) {
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-      <Card label="현금 잔고"   value={`$${cash.toLocaleString("en",{minimumFractionDigits:2})}`}   flash={cash} />
-      <Card label="총 평가자산" value={`$${liveEquity.toLocaleString("en",{minimumFractionDigits:2})}`} flash={liveEquity} />
+      <Card label="현금 잔고"   value={fmtKrw(cash, rate)}       flash={cash} />
+      <Card label="총 평가자산" value={fmtKrw(liveEquity, rate)}  flash={liveEquity} />
       <Card
         label="누적 수익률"
         value={`${isPos?"+":""}${liveRet.toFixed(2)}%`}

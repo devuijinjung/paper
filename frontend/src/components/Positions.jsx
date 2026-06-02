@@ -1,4 +1,5 @@
 import { useFlash } from "../useFlash";
+import { fmtKrw } from "../fmt";
 
 function usePositionData(p, sp) {
   const live = sp?.price ?? p.current_price;
@@ -7,7 +8,7 @@ function usePositionData(p, sp) {
   return { live, pnl, pct, isPos: pnl >= 0 };
 }
 
-function MobileCard({ p, sp }) {
+function MobileCard({ p, sp, rate }) {
   const { live, pnl, pct, isPos } = usePositionData(p, sp);
   const priceF = useFlash(live);
   const pnlF   = useFlash(pnl);
@@ -17,7 +18,7 @@ function MobileCard({ p, sp }) {
       <div className="flex items-center justify-between">
         <span className="font-semibold text-white">{p.ticker}</span>
         <span className={`font-bold tabular-nums ${isPos ? "val-pos" : "val-neg"} ${pnlF}`}>
-          {isPos ? "+" : ""}{pnl.toFixed(2)}
+          {fmtKrw(pnl, rate, isPos)}
           <span className="text-xs ml-1.5 opacity-70">({isPos ? "+" : ""}{pct.toFixed(2)}%)</span>
         </span>
       </div>
@@ -28,12 +29,12 @@ function MobileCard({ p, sp }) {
         </div>
         <div>
           <p className="text-gray-600 mb-0.5">평단가</p>
-          <p className="text-gray-300 tabular-nums">${p.avg_price.toLocaleString("en",{minimumFractionDigits:2})}</p>
+          <p className="text-gray-300 tabular-nums">{fmtKrw(p.avg_price, rate)}</p>
         </div>
         <div>
           <p className="text-gray-600 mb-0.5">현재가</p>
           <p className={`text-gray-200 tabular-nums ${priceF}`}>
-            ${live.toLocaleString("en",{minimumFractionDigits:2,maximumFractionDigits:2})}
+            {fmtKrw(live, rate)}
           </p>
         </div>
       </div>
@@ -41,7 +42,7 @@ function MobileCard({ p, sp }) {
   );
 }
 
-function TableRow({ p, sp }) {
+function TableRow({ p, sp, rate }) {
   const { live, pnl, pct, isPos } = usePositionData(p, sp);
   const priceF = useFlash(live);
   const pnlF   = useFlash(pnl);
@@ -50,12 +51,12 @@ function TableRow({ p, sp }) {
     <tr className="border-b border-gray-800/60 hover:bg-gray-800/30 transition-colors">
       <td className="py-3 pr-4 font-semibold text-white">{p.ticker}</td>
       <td className="py-3 pr-4 tabular-nums text-gray-300">{p.qty.toFixed(6)}</td>
-      <td className="py-3 pr-4 tabular-nums text-gray-300">${p.avg_price.toLocaleString("en",{minimumFractionDigits:2})}</td>
+      <td className="py-3 pr-4 tabular-nums text-gray-300">{fmtKrw(p.avg_price, rate)}</td>
       <td className={`py-3 pr-4 tabular-nums font-medium ${priceF}`}>
-        ${live.toLocaleString("en",{minimumFractionDigits:2,maximumFractionDigits:2})}
+        {fmtKrw(live, rate)}
       </td>
       <td className={`py-3 pr-4 tabular-nums font-medium ${isPos?"val-pos":"val-neg"} ${pnlF}`}>
-        {isPos?"+":""}{pnl.toFixed(2)}
+        {fmtKrw(pnl, rate, isPos)}
       </td>
       <td className={`py-3 tabular-nums font-medium ${isPos?"val-pos":"val-neg"}`}>
         {isPos?"+":""}{pct.toFixed(2)}%
@@ -64,7 +65,7 @@ function TableRow({ p, sp }) {
   );
 }
 
-export default function Positions({ positions, streamPrices }) {
+export default function Positions({ positions, streamPrices, rate }) {
   if (!positions?.length)
     return <div className="flex items-center justify-center h-32 text-gray-600">보유 포지션 없음</div>;
 
@@ -73,7 +74,7 @@ export default function Positions({ positions, streamPrices }) {
       {/* Mobile: card list */}
       <div className="space-y-2 md:hidden">
         {positions.map(p => (
-          <MobileCard key={p.ticker} p={p} sp={streamPrices?.[p.ticker]} />
+          <MobileCard key={p.ticker} p={p} sp={streamPrices?.[p.ticker]} rate={rate} />
         ))}
       </div>
 
@@ -89,7 +90,7 @@ export default function Positions({ positions, streamPrices }) {
           </thead>
           <tbody>
             {positions.map(p => (
-              <TableRow key={p.ticker} p={p} sp={streamPrices?.[p.ticker]} />
+              <TableRow key={p.ticker} p={p} sp={streamPrices?.[p.ticker]} rate={rate} />
             ))}
           </tbody>
         </table>

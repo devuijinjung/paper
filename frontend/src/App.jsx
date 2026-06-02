@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useWebSocket }     from "./useWebSocket";
 import { useBinanceStream } from "./useBinanceStream";
+import { useExchangeRate }  from "./useExchangeRate";
 import Summary    from "./components/Summary";
 import Stats      from "./components/Stats";
 import LiveTicker from "./components/LiveTicker";
@@ -24,6 +25,7 @@ export default function App() {
   const [tab,          setTab]          = useState(0);
   const [wsStatus,     setWsStatus]     = useState("연결 중...");
   const alertPollRef = useRef(null);
+  const rate = useExchangeRate();
 
   // ── Load all data ────────────────────────────────────────────────────────
   const load = useCallback(async () => {
@@ -99,9 +101,9 @@ export default function App() {
         </div>
       </header>
 
-      <LiveTicker data={streamPrices["BTCUSDT"]} />
-      <Summary   portfolio={portfolio} streamPrices={streamPrices} />
-      <Stats     stats={stats} />
+      <LiveTicker data={streamPrices["BTCUSDT"]} rate={rate} />
+      <Summary   portfolio={portfolio} streamPrices={streamPrices} rate={rate} />
+      <Stats     stats={stats} rate={rate} />
 
       {/* ── Tabs ── */}
       <div className="mb-4 border-b border-gray-800">
@@ -118,11 +120,11 @@ export default function App() {
       </div>
 
       <div className="card p-3 sm:p-5 min-h-48">
-        {tab === 0 && <Positions  positions={portfolio?.positions} streamPrices={streamPrices} />}
-        {tab === 1 && <Trades     trades={trades} />}
-        {tab === 2 && <EquityCurve history={portfolio?.balance_history} />}
+        {tab === 0 && <Positions  positions={portfolio?.positions} streamPrices={streamPrices} rate={rate} />}
+        {tab === 1 && <Trades     trades={trades} rate={rate} />}
+        {tab === 2 && <EquityCurve history={portfolio?.balance_history} rate={rate} />}
         {tab === 3 && <AlertLogs  logs={alerts} />}
-        {tab === 4 && <Settings   onReset={load} onTrade={load} />}
+        {tab === 4 && <Settings   onReset={load} onTrade={load} rate={rate} />}
       </div>
     </div>
   );
