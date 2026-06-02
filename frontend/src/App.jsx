@@ -122,7 +122,7 @@ export default function App() {
         {tab === 1 && <Trades     trades={trades} />}
         {tab === 2 && <EquityCurve history={portfolio?.balance_history} />}
         {tab === 3 && <AlertLogs  logs={alerts} />}
-        {tab === 4 && <Settings   onReset={load} />}
+        {tab === 4 && <Settings   onReset={load} onTrade={load} />}
       </div>
     </div>
   );

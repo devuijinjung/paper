@@ -23,7 +23,75 @@ function CopyRow({ label, url, color = "text-emerald-400" }) {
   );
 }
 
-export default function Settings({ onReset }) {
+function TestTrade({ onDone }) {
+  const [ticker,  setTicker]  = useState("BTCUSDT");
+  const [secret,  setSecret]  = useState("");
+  const [result,  setResult]  = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  const send = async (action) => {
+    if (!secret) { setResult({ ok: false, msg: "시크릿을 입력하세요" }); return; }
+    setLoading(true);
+    setResult(null);
+    try {
+      const res = await fetch(
+        `/webhook?ticker=${encodeURIComponent(ticker)}&secret=${encodeURIComponent(secret)}`,
+        { method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action }) }
+      );
+      const data = await res.json();
+      if (res.ok) {
+        setResult({ ok: true, msg: `✓ ${action === "buy" ? "매수" : action === "sell" ? "매도" : "청산"} 체결: $${data.trade?.price?.toLocaleString("en", { minimumFractionDigits: 2 })}` });
+        onDone?.();
+      } else {
+        setResult({ ok: false, msg: data.detail ?? "오류 발생" });
+      }
+    } catch {
+      setResult({ ok: false, msg: "서버 연결 오류" });
+    }
+    setLoading(false);
+    setTimeout(() => setResult(null), 4000);
+  };
+
+  return (
+    <div>
+      <p className="label mb-2">수동 테스트 주문</p>
+      <p className="text-xs text-gray-500 mb-3">TradingView 신호 없이 직접 주문을 실행합니다.</p>
+      <div className="flex gap-2 mb-3">
+        <input value={ticker} onChange={e => setTicker(e.target.value.toUpperCase())}
+          placeholder="티커" className="w-28 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500" />
+        <input value={secret} onChange={e => setSecret(e.target.value)}
+          placeholder="웹훅 시크릿" type="text"
+          className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500" />
+      </div>
+      <div className="flex gap-2">
+        <button onClick={() => send("buy")} disabled={loading}
+          className="flex-1 py-2 text-sm font-semibold rounded-lg bg-emerald-700/40 hover:bg-emerald-700/60 text-emerald-300 border border-emerald-700/50 transition disabled:opacity-40">
+          매수
+        </button>
+        <button onClick={() => send("sell")} disabled={loading}
+          className="flex-1 py-2 text-sm font-semibold rounded-lg bg-rose-700/40 hover:bg-rose-700/60 text-rose-300 border border-rose-700/50 transition disabled:opacity-40">
+          매도
+        </button>
+        <button onClick={() => send("close")} disabled={loading}
+          className="flex-1 py-2 text-sm font-semibold rounded-lg bg-gray-700/40 hover:bg-gray-700/60 text-gray-300 border border-gray-700/50 transition disabled:opacity-40">
+          청산
+        </button>
+      </div>
+      {result && (
+        <p className={`text-xs mt-2 ${result.ok ? "text-emerald-400" : "text-rose-400"}`}>
+          {result.msg}
+        </p>
+      )}
+    </div>
+  );
+}
+      </div>
+    </div>
+  );
+}
+
+export default function Settings({ onReset, onTrade }) {
   const [capital,   setCapital]   = useState("10000");
   const [fee,       setFee]       = useState("0.001");
   const [slip,      setSlip]      = useState("0.0005");
@@ -107,6 +175,11 @@ export default function Settings({ onReset }) {
         <p className="text-xs text-gray-600 mt-2">
           시크릿은 Render 대시보드 → Environment → WEBHOOK_SECRET 에서 확인하세요.
         </p>
+      </div>
+
+      {/* ── 수동 테스트 ── */}
+      <div className="border-t border-gray-800 pt-5">
+        <TestTrade onDone={onTrade} />
       </div>
 
       {/* ── 매매 파라미터 ── */}
