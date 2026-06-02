@@ -21,9 +21,9 @@ logger = logging.getLogger(__name__)
 def _parse_text_body(text: str) -> dict:
     """Extract trading fields from any plain-text TradingView alert message.
 
-    Works with the default strategy message format:
-      '오더 buy @ 0.001 필드 온 BTCUSDT. 뉴 스트래티지 포지션은 0.001'
-    or a simple keyword like 'buy' / 'sell'.
+    Only extracts action and ticker — NOT quantity, because
+    {{strategy.order.contracts}} is the strategy's contract count (e.g. 1 BTC)
+    which would exceed most paper-trading balances.
     """
     result = {}
     # Action: first recognized alias found in the text
@@ -31,17 +31,10 @@ def _parse_text_body(text: str) -> dict:
         if word in _ACTION_ALIASES:
             result["action"] = word
             break
-    # Ticker: common crypto/stock pair pattern (BTCUSDT, ETHBTC, etc.)
+    # Ticker: common crypto/stock pair pattern (BTCUSDT, ETHUSDT, etc.)
     m = re.search(r"\b([A-Z]{2,6}(?:USDT|BTC|ETH|BUSD|USD|EUR|GBP|KRW))\b", text.upper())
     if m:
         result["ticker"] = m.group(1)
-    # Quantity: number after "@"  ({{strategy.order.contracts}})
-    m = re.search(r"@\s*([\d.]+)", text)
-    if m:
-        try:
-            result["quantity"] = float(m.group(1))
-        except ValueError:
-            pass
     return result
 
 
