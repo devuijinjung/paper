@@ -88,6 +88,7 @@ class TradeOut(BaseModel):
 
 class PositionOut(BaseModel):
     ticker: str
+    side: str  # "long" | "short"
     qty: float
     avg_price: float
     current_price: float

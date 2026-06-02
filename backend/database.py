@@ -19,4 +19,12 @@ async def get_db() -> AsyncSession:
 async def init_db():
     async with engine.begin() as conn:
         from models import Trade, Position, BalanceHistory, AlertLog  # noqa: F401
+        from sqlalchemy import text
         await conn.run_sync(Base.metadata.create_all)
+        # Migration: add 'side' column to positions (futures mode upgrade)
+        try:
+            await conn.execute(
+                text("ALTER TABLE positions ADD COLUMN side VARCHAR(8) DEFAULT 'long'")
+            )
+        except Exception:
+            pass  # column already exists

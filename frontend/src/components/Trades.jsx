@@ -3,13 +3,22 @@ import { fmtKrw } from "../fmt";
 
 const PAGE = 20;
 
+const SIDE_LABEL = { long: "롱", short: "숏", close: "청산", buy: "롱", sell: "숏" };
+const SIDE_COLOR = {
+  long:  "text-emerald-400",
+  short: "text-rose-400",
+  close: "text-gray-400",
+  buy:   "text-emerald-400",
+  sell:  "text-rose-400",
+};
+
 function MobileCard({ t, rate }) {
   const pnlPos = t.realized_pnl >= 0;
   return (
     <div className="card p-3 text-xs space-y-1.5">
       <div className="flex items-center gap-2">
-        <span className={`font-bold ${t.side === "buy" ? "text-emerald-400" : "text-rose-400"}`}>
-          {t.side === "buy" ? "매수" : "매도"}
+        <span className={`font-bold ${SIDE_COLOR[t.side] ?? "text-gray-400"}`}>
+          {SIDE_LABEL[t.side] ?? t.side}
         </span>
         <span className="font-semibold text-sm text-white">{t.ticker}</span>
         <span className="text-gray-500 ml-auto whitespace-nowrap">
@@ -73,10 +82,8 @@ export default function Trades({ trades, rate }) {
                     {new Date(t.ts).toLocaleString("ko",{month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"})}
                   </td>
                   <td className="py-2.5 pr-4 font-medium">{t.ticker}</td>
-                  <td className={`py-2.5 pr-4 font-bold text-xs px-2 rounded ${
-                    t.side === "buy" ? "text-emerald-400" : "text-rose-400"
-                  }`}>
-                    {t.side === "buy" ? "매수" : "매도"}
+                  <td className={`py-2.5 pr-4 font-bold text-xs ${SIDE_COLOR[t.side] ?? "text-gray-400"}`}>
+                    {SIDE_LABEL[t.side] ?? t.side}
                   </td>
                   <td className="py-2.5 pr-4 tabular-nums">{fmtKrw(t.price, rate)}</td>
                   <td className="py-2.5 pr-4 tabular-nums text-gray-400">{t.qty.toFixed(6)}</td>

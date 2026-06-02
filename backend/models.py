@@ -15,7 +15,7 @@ class Trade(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     ts: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     ticker: Mapped[str] = mapped_column(String(32))
-    side: Mapped[str] = mapped_column(String(8))   # buy | sell
+    side: Mapped[str] = mapped_column(String(16))   # long | short | close
     price: Mapped[float] = mapped_column(Float)
     qty: Mapped[float] = mapped_column(Float)
     fee: Mapped[float] = mapped_column(Float)
@@ -27,6 +27,7 @@ class Position(Base):
     __tablename__ = "positions"
 
     ticker: Mapped[str] = mapped_column(String(32), primary_key=True)
+    side: Mapped[str] = mapped_column(String(8), default="long")  # long | short
     qty: Mapped[float] = mapped_column(Float, default=0.0)
     avg_price: Mapped[float] = mapped_column(Float, default=0.0)
     current_price: Mapped[float] = mapped_column(Float, default=0.0)
