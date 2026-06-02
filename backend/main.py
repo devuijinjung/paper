@@ -125,6 +125,12 @@ app.include_router(webhook.router)
 app.include_router(api.router)
 app.include_router(ws.router)
 
+
+@app.api_route("/health", methods=["GET", "HEAD"], include_in_schema=False)
+async def health():
+    return {"status": "ok"}
+
+
 _FRONTEND_DIST = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
 
 
