@@ -5,6 +5,26 @@ TradingView 알림(Alert)이 보내는 웹훅을 수신해 **가상 자금으로
 
 ---
 
+## Render 배포
+
+### 한 번에 배포 (Blueprint)
+
+1. 이 저장소를 GitHub에 Push
+2. [Render Dashboard](https://dashboard.render.com/) → **New → Blueprint**
+3. 저장소를 연결하면 `render.yaml`을 자동 인식해 다음을 생성:
+   - **Web Service** (Docker) — FastAPI + 빌드된 React SPA
+   - **PostgreSQL** (free tier) — 자동 연결
+4. `WEBHOOK_SECRET` 값은 Render가 자동 생성 → Dashboard → Environment에서 확인
+
+배포 완료 후 TradingView 웹훅 URL:
+```
+https://<앱이름>.onrender.com/webhook
+```
+
+> **무료 플랜 주의**: 15분 비활성 시 슬립(cold start ~30초). 지속 사용이라면 $7/월 플랜 권장.
+
+---
+
 ## 프로젝트 구조
 
 ```

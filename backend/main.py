@@ -1,9 +1,11 @@
 import asyncio
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from sqlalchemy import select
 
 from database import init_db, AsyncSessionLocal
@@ -96,3 +98,17 @@ app.add_middleware(
 app.include_router(webhook.router)
 app.include_router(api.router)
 app.include_router(ws.router)
+
+# Serve the built React SPA for any path not matched by the API/WS routes above.
+# This must be registered last so it acts as a catch-all.
+_FRONTEND_DIST = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
+
+
+@app.get("/{full_path:path}", include_in_schema=False)
+async def serve_spa(full_path: str):
+    if not os.path.isdir(_FRONTEND_DIST):
+        return {"detail": "Frontend not built. Run: npm run build inside frontend/"}
+    target = os.path.join(_FRONTEND_DIST, full_path) if full_path else ""
+    if target and os.path.isfile(target):
+        return FileResponse(target)
+    return FileResponse(os.path.join(_FRONTEND_DIST, "index.html"))
