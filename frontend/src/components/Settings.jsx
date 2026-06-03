@@ -1,7 +1,23 @@
 import { useState } from "react";
 import { fmtKrw } from "../fmt";
+import { useToast } from "../Toast";
+import { IconCopy, IconCheck, IconUp, IconDown, IconClose, IconRefresh, IconBolt } from "../icons";
 
-function CopyRow({ label, url, color = "text-emerald-400" }) {
+function Section({ title, desc, icon, children }) {
+  return (
+    <div className="space-y-3">
+      <div>
+        <p className="flex items-center gap-2 text-sm font-bold text-gray-200">
+          {icon} {title}
+        </p>
+        {desc && <p className="text-xs text-gray-500 mt-1">{desc}</p>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function CopyRow({ label, url }) {
   const [copied, setCopied] = useState(false);
   const copy = () => {
     navigator.clipboard?.writeText(url).catch(() => {});
@@ -10,232 +26,150 @@ function CopyRow({ label, url, color = "text-emerald-400" }) {
   };
   return (
     <div>
-      <p className="text-xs text-gray-500 mb-1">{label}</p>
+      {label && <p className="text-xs text-gray-500 mb-1.5">{label}</p>}
       <div className="flex gap-2">
-        <code className={`flex-1 bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs ${color} break-all`}>
+        <code className="flex-1 bg-ink-950 border border-white/[0.06] rounded-xl px-3 py-2.5 text-xs text-emerald-300 break-all font-mono">
           {url}
         </code>
-        <button
-          onClick={copy}
-          className="flex-shrink-0 px-3 py-2 text-xs bg-gray-800 hover:bg-gray-700 rounded-lg transition text-gray-300"
-        >{copied ? "✓" : "복사"}</button>
+        <button onClick={copy} className="btn-ghost px-3 shrink-0">
+          {copied ? <IconCheck width={14} className="text-emerald-400" /> : <IconCopy width={14} />}
+        </button>
       </div>
     </div>
   );
 }
 
 function TestTrade({ onDone, rate }) {
-  const [ticker,  setTicker]  = useState("BTCUSDT");
-  const [secret,  setSecret]  = useState("");
-  const [result,  setResult]  = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [ticker, setTicker] = useState("BTCUSDT");
+  const [secret, setSecret] = useState("");
+  const [loading, setLoading] = useState(null);
+  const toast = useToast();
 
   const send = async (action) => {
-    if (!secret) { setResult({ ok: false, msg: "시크릿을 입력하세요" }); return; }
-    setLoading(true);
-    setResult(null);
+    if (!secret) { toast("웹훅 시크릿을 입력하세요", "error"); return; }
+    setLoading(action);
     try {
       const res = await fetch(
         `/webhook?ticker=${encodeURIComponent(ticker)}&secret=${encodeURIComponent(secret)}`,
-        { method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action }) }
+        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action }) }
       );
       const data = await res.json();
       if (res.ok) {
-        const label = action === "buy" ? "매수" : action === "sell" ? "매도" : "청산";
-        const priceKrw = fmtKrw(data.trade?.price, rate);
-        setResult({ ok: true, msg: `✓ ${label} 체결: ${priceKrw}` });
+        const label = action === "buy" ? "롱 진입" : action === "sell" ? "숏 진입" : "청산";
+        toast(`${label} 체결 @ ${fmtKrw(data.trade?.price, rate)}`, "success");
         onDone?.();
       } else {
-        setResult({ ok: false, msg: data.detail ?? "오류 발생" });
+        toast(data.detail ?? "주문 실패", "error");
       }
-    } catch {
-      setResult({ ok: false, msg: "서버 연결 오류" });
-    }
-    setLoading(false);
-    setTimeout(() => setResult(null), 4000);
+    } catch { toast("서버 연결 오류", "error"); }
+    setLoading(null);
   };
 
   return (
-    <div>
-      <p className="label mb-2">수동 테스트 주문</p>
-      <p className="text-xs text-gray-500 mb-3">TradingView 신호 없이 직접 주문을 실행합니다.</p>
-      <div className="flex gap-2 mb-3">
-        <input value={ticker} onChange={e => setTicker(e.target.value.toUpperCase())}
-          placeholder="티커" className="w-28 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500" />
-        <input value={secret} onChange={e => setSecret(e.target.value)}
-          placeholder="웹훅 시크릿" type="text"
-          className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500" />
-      </div>
+    <div className="space-y-3">
       <div className="flex gap-2">
-        <button onClick={() => send("buy")} disabled={loading}
-          className="flex-1 py-2 text-sm font-semibold rounded-lg bg-emerald-700/40 hover:bg-emerald-700/60 text-emerald-300 border border-emerald-700/50 transition disabled:opacity-40">
-          매수
+        <input value={ticker} onChange={e => setTicker(e.target.value.toUpperCase())} placeholder="티커" className="input w-32" />
+        <input value={secret} onChange={e => setSecret(e.target.value)} placeholder="웹훅 시크릿" className="input flex-1" />
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        <button onClick={() => send("buy")} disabled={loading} className="btn-up py-2.5">
+          <IconUp width={15} /> {loading === "buy" ? "…" : "롱"}
         </button>
-        <button onClick={() => send("sell")} disabled={loading}
-          className="flex-1 py-2 text-sm font-semibold rounded-lg bg-rose-700/40 hover:bg-rose-700/60 text-rose-300 border border-rose-700/50 transition disabled:opacity-40">
-          매도
+        <button onClick={() => send("sell")} disabled={loading} className="btn-down py-2.5">
+          <IconDown width={15} /> {loading === "sell" ? "…" : "숏"}
         </button>
-        <button onClick={() => send("close")} disabled={loading}
-          className="flex-1 py-2 text-sm font-semibold rounded-lg bg-gray-700/40 hover:bg-gray-700/60 text-gray-300 border border-gray-700/50 transition disabled:opacity-40">
-          청산
+        <button onClick={() => send("close")} disabled={loading} className="btn-ghost py-2.5">
+          <IconClose width={15} /> {loading === "close" ? "…" : "청산"}
         </button>
       </div>
-      {result && (
-        <p className={`text-xs mt-2 ${result.ok ? "text-emerald-400" : "text-rose-400"}`}>
-          {result.msg}
-        </p>
-      )}
     </div>
   );
 }
 
 export default function Settings({ onReset, onTrade, rate }) {
-  const [capital,   setCapital]   = useState(() => String(Math.round(10000 * rate)));
-  const [fee,       setFee]       = useState("0.001");
-  const [slip,      setSlip]      = useState("0.0005");
-  const [msg,       setMsg]       = useState(null);
-  const [confirm,   setConfirm]   = useState(false);
-
-  // URL builder state
+  const [capital, setCapital] = useState(() => String(Math.round(10000 * rate)));
+  const [fee,     setFee]     = useState("0.001");
+  const [slip,    setSlip]    = useState("0.0005");
+  const [confirm, setConfirm] = useState(false);
   const [urlTicker, setUrlTicker] = useState("BTCUSDT");
   const [urlSecret, setUrlSecret] = useState("");
+  const toast = useToast();
 
-  const origin     = window.location.origin;
-  const base       = `${origin}/webhook`;
-  const secretPart = urlSecret ? `&secret=${urlSecret}` : "&secret=YOUR_SECRET";
+  const base = `${window.location.origin}/webhook`;
+  const secretPart = urlSecret ? `&secret=${urlSecret}` : "&secret=시크릿";
+  const webhookUrl = `${base}?ticker=${urlTicker || "BTCUSDT"}${secretPart}`;
 
   const doReset = async () => {
     setConfirm(false);
     try {
       const res = await fetch("/api/reset", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           initial_capital: parseFloat(capital) / rate,
-          fee_rate:        parseFloat(fee),
-          slippage:        parseFloat(slip),
+          fee_rate: parseFloat(fee), slippage: parseFloat(slip),
         }),
       });
-      setMsg({ text: res.ok ? "계좌가 초기화됐습니다." : "초기화 실패", ok: res.ok });
-      if (res.ok) onReset?.();
-    } catch {
-      setMsg({ text: "서버 연결 오류", ok: false });
-    }
-    setTimeout(() => setMsg(null), 3000);
+      if (res.ok) { toast("계좌가 초기화되었습니다", "success"); onReset?.(); }
+      else toast("초기화 실패", "error");
+    } catch { toast("서버 연결 오류", "error"); }
   };
 
   return (
-    <div className="space-y-6 max-w-lg">
-
-      {/* ── URL 빌더 ── */}
-      <div>
-        <p className="label mb-1">웹훅 URL</p>
-        <p className="text-xs text-gray-500 mb-3">
-          URL 하나로 매수·매도 모두 처리합니다.
-          알림 메시지에 <span className="text-emerald-400 font-mono">buy</span> 또는{" "}
-          <span className="text-rose-400 font-mono">sell</span>만 입력하면 됩니다.
-        </p>
-
-        <div className="flex gap-2 mb-3">
-          <input
-            value={urlTicker}
-            onChange={e => setUrlTicker(e.target.value.toUpperCase())}
-            placeholder="티커 (예: BTCUSDT)"
-            className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm
-                       focus:outline-none focus:ring-1 focus:ring-emerald-500"
-          />
-          <input
-            value={urlSecret}
-            onChange={e => setUrlSecret(e.target.value)}
-            placeholder="웹훅 시크릿"
-            type="text"
-            className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm
-                       focus:outline-none focus:ring-1 focus:ring-emerald-500"
-          />
+    <div className="space-y-7 max-w-xl">
+      <Section title="웹훅 URL" icon={<IconBolt width={15} className="text-brand-400" />}
+        desc="이 URL 하나로 롱·숏·청산을 모두 처리합니다. 알림 메시지는 기본값 그대로 두어도 됩니다.">
+        <div className="flex gap-2">
+          <input value={urlTicker} onChange={e => setUrlTicker(e.target.value.toUpperCase())} placeholder="티커 (BTCUSDT)" className="input flex-1" />
+          <input value={urlSecret} onChange={e => setUrlSecret(e.target.value)} placeholder="웹훅 시크릿" className="input flex-1" />
         </div>
-
-        <CopyRow label="웹훅 URL (매수·매도 공용)" url={`${base}?ticker=${urlTicker || "BTCUSDT"}${secretPart}`} />
-
-        <div className="mt-3 bg-gray-950 border border-gray-800 rounded-lg p-3 text-xs space-y-2">
-          <p className="text-gray-500 font-medium">알림 메시지 — 아무거나 OK</p>
-          <div className="space-y-1 text-gray-600">
-            <p>✓ 기본 메시지 그대로 사용 가능</p>
-            <p>✓ <code className="text-gray-400">buy</code> / <code className="text-gray-400">sell</code> 한 단어만 입력</p>
-            <p>✓ <code className="text-gray-400">long</code> / <code className="text-gray-400">short</code> / <code className="text-gray-400">close</code> 등 키워드 포함</p>
+        <CopyRow url={webhookUrl} />
+        <div className="bg-ink-950 border border-white/[0.05] rounded-xl p-3 text-xs space-y-1.5">
+          <p className="text-gray-400 font-semibold">신호 매핑</p>
+          <div className="grid grid-cols-1 gap-1 text-gray-500">
+            <p><code className="text-emerald-400">buy / long</code> → 롱 진입 (숏 보유 시 자동 청산 후 전환)</p>
+            <p><code className="text-rose-400">sell / short</code> → 숏 진입 (롱 보유 시 자동 청산 후 전환)</p>
+            <p><code className="text-gray-300">close / exit</code> → 현재 포지션 청산</p>
           </div>
-          <p className="text-gray-700">메시지 어디에 있든 buy/sell 키워드와 티커를 자동 추출합니다.</p>
         </div>
+      </Section>
 
-        <p className="text-xs text-gray-600 mt-2">
-          시크릿은 Render 대시보드 → Environment → WEBHOOK_SECRET 에서 확인하세요.
-        </p>
+      <div className="border-t border-white/[0.06] pt-6">
+        <Section title="수동 주문" icon={<IconBolt width={15} className="text-amber-400" />}
+          desc="TradingView 신호 없이 즉시 시장가로 주문을 실행합니다.">
+          <TestTrade onDone={onTrade} rate={rate} />
+        </Section>
       </div>
 
-      {/* ── 수동 테스트 ── */}
-      <div className="border-t border-gray-800 pt-5">
-        <TestTrade onDone={onTrade} rate={rate} />
+      <div className="border-t border-white/[0.06] pt-6">
+        <Section title="매매 파라미터" icon={<IconRefresh width={15} className="text-gray-400" />}>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <label className="block">
+              <span className="text-xs text-gray-500">초기 자본 (₩)</span>
+              <input type="number" step="1000000" value={capital} onChange={e => setCapital(e.target.value)} className="input mt-1.5" />
+            </label>
+            <label className="block">
+              <span className="text-xs text-gray-500">수수료율</span>
+              <input type="number" step="0.0001" value={fee} onChange={e => setFee(e.target.value)} className="input mt-1.5" />
+            </label>
+            <label className="block">
+              <span className="text-xs text-gray-500">슬리피지</span>
+              <input type="number" step="0.0001" value={slip} onChange={e => setSlip(e.target.value)} className="input mt-1.5" />
+            </label>
+          </div>
+        </Section>
       </div>
 
-      {/* ── 매매 파라미터 ── */}
-      <div className="border-t border-gray-800 pt-5">
-        <p className="label mb-3">매매 파라미터</p>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <label className="block">
-            <span className="text-xs text-gray-500">초기 자본 (₩)</span>
-            <input
-              type="number" step="1000000" value={capital}
-              onChange={e => setCapital(e.target.value)}
-              className="mt-1 w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm
-                         focus:outline-none focus:ring-1 focus:ring-emerald-500"
-            />
-          </label>
-          <label className="block">
-            <span className="text-xs text-gray-500">수수료율</span>
-            <input
-              type="number" step="0.0001" value={fee}
-              onChange={e => setFee(e.target.value)}
-              className="mt-1 w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm
-                         focus:outline-none focus:ring-1 focus:ring-emerald-500"
-            />
-          </label>
-          <label className="block">
-            <span className="text-xs text-gray-500">슬리피지</span>
-            <input
-              type="number" step="0.0001" value={slip}
-              onChange={e => setSlip(e.target.value)}
-              className="mt-1 w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm
-                         focus:outline-none focus:ring-1 focus:ring-emerald-500"
-            />
-          </label>
-        </div>
-      </div>
-
-      {/* ── 계좌 초기화 ── */}
-      <div className="border-t border-gray-800 pt-5">
+      <div className="border-t border-white/[0.06] pt-6">
         {!confirm ? (
-          <button
-            onClick={() => setConfirm(true)}
-            className="bg-rose-600/20 border border-rose-600/40 hover:bg-rose-600/30
-                       text-rose-400 text-sm font-semibold px-5 py-2 rounded-lg transition"
-          >계좌 초기화</button>
+          <button onClick={() => setConfirm(true)} className="btn-down px-5 py-2.5">
+            <IconRefresh width={15} /> 계좌 초기화
+          </button>
         ) : (
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-gray-400">정말 초기화할까요?</span>
-            <button onClick={doReset}
-              className="bg-rose-600 hover:bg-rose-500 text-white text-sm font-semibold px-4 py-1.5 rounded-lg transition">
-              확인
-            </button>
-            <button onClick={() => setConfirm(false)}
-              className="text-sm text-gray-500 hover:text-white px-4 py-1.5 rounded-lg bg-gray-800 transition">
-              취소
-            </button>
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="text-sm text-gray-400">모든 거래 기록이 삭제됩니다. 계속할까요?</span>
+            <button onClick={doReset} className="btn-down px-4 py-2">확인</button>
+            <button onClick={() => setConfirm(false)} className="btn-ghost px-4 py-2">취소</button>
           </div>
-        )}
-        {msg && (
-          <p className={`text-sm mt-3 ${msg.ok ? "text-emerald-400" : "text-rose-400"}`}>
-            {msg.text}
-          </p>
         )}
       </div>
     </div>

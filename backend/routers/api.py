@@ -109,6 +109,33 @@ async def reset_account(req: ResetRequest, db: AsyncSession = Depends(get_db)):
     return {"status": "ok", "message": "Account reset"}
 
 
+@router.post("/close/{ticker}")
+async def close_position(ticker: str, db: AsyncSession = Depends(get_db)):
+    """Manually close an open position at the current market price."""
+    from fastapi import HTTPException
+    from trading_engine import NoPositionError
+    from ws_manager import manager
+
+    ticker = ticker.upper().strip()
+    prices = await fetch_prices([ticker])
+    if ticker not in prices:
+        raise HTTPException(502, f"{ticker} 가격을 가져올 수 없습니다")
+    try:
+        trade = await engine.execute_close(db, ticker, prices[ticker], strategy="manual")
+        await db.commit()
+    except NoPositionError as exc:
+        await db.rollback()
+        raise HTTPException(422, str(exc))
+
+    summary = await engine.get_portfolio_summary(db)
+    result = {
+        "trade_id": trade.id, "side": trade.side, "price": trade.price,
+        "qty": trade.qty, "realized_pnl": trade.realized_pnl,
+    }
+    await manager.broadcast({"type": "trade", "summary": summary, "trade": result})
+    return {"status": "ok", "trade": result}
+
+
 @router.get("/stats")
 async def get_stats(db: AsyncSession = Depends(get_db)):
     trades_res  = await db.execute(select(Trade).order_by(Trade.ts))
