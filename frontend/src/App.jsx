@@ -4,23 +4,14 @@ import { useBinanceStream } from "./useBinanceStream";
 import { useExchangeRate }  from "./useExchangeRate";
 import { useToast }         from "./Toast";
 import { fmtKrw }           from "./fmt";
-import Summary    from "./components/Summary";
-import Stats      from "./components/Stats";
-import LiveTicker from "./components/LiveTicker";
-import Positions  from "./components/Positions";
-import Trades     from "./components/Trades";
+import Positions   from "./components/Positions";
+import Trades      from "./components/Trades";
+import Stats       from "./components/Stats";
 import EquityCurve from "./components/EquityCurve";
-import AlertLogs  from "./components/AlertLogs";
-import Settings   from "./components/Settings";
-import { IconChart, IconList, IconWallet, IconBell, IconGear } from "./icons";
+import AlertLogs   from "./components/AlertLogs";
+import Settings    from "./components/Settings";
+import OrderPanel, { MobileAccountBar } from "./components/OrderPanel";
 
-const TABS = [
-  { name: "포지션",   icon: IconWallet },
-  { name: "거래내역", icon: IconList },
-  { name: "자산곡선", icon: IconChart },
-  { name: "알림로그", icon: IconBell },
-  { name: "설정",     icon: IconGear },
-];
 const WS_URL = `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`;
 
 async function apiFetch(path) { return fetch(path).then(r => r.json()); }
@@ -34,40 +25,76 @@ function useClock() {
   return now;
 }
 
+function MarketBar({ data, rate }) {
+  const price  = data?.price;
+  const change = data?.change_pct;
+  const isPos  = (change ?? 0) >= 0;
+  return (
+    <div className="flex items-center gap-5 px-4 overflow-x-auto min-w-0">
+      <div className="flex items-center gap-3 shrink-0">
+        <span className="text-sm font-bold text-gray-300">BTC/USDT</span>
+        <span className={`text-lg font-bold font-mono tabular-nums ${isPos ? "text-up" : "text-down"}`}>
+          {price ? `$${price.toLocaleString("en", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—"}
+        </span>
+        {change !== undefined && change !== null && (
+          <span className={`text-xs font-semibold shrink-0 ${isPos ? "text-up" : "text-down"}`}>
+            {isPos ? "+" : ""}{change.toFixed(2)}%
+          </span>
+        )}
+      </div>
+      <div className="hidden sm:flex items-center gap-5 text-xs text-gray-600 shrink-0">
+        {data?.high   && <span>고가 <span className="text-gray-400 font-mono">${Number(data.high).toLocaleString()}</span></span>}
+        {data?.low    && <span>저가 <span className="text-gray-400 font-mono">${Number(data.low).toLocaleString()}</span></span>}
+        {data?.volume && <span className="hidden md:inline">
+          24H Vol <span className="text-gray-400 font-mono">{(data.volume / 1e6).toFixed(2)}M</span>
+        </span>}
+        {rate && <span className="hidden lg:inline">₩{Math.round(rate).toLocaleString()}/$</span>}
+      </div>
+    </div>
+  );
+}
+
+const TABS = [
+  { key: "pos",      label: "포지션"   },
+  { key: "trades",   label: "거래내역" },
+  { key: "stats",    label: "성과분석" },
+  { key: "chart",    label: "자산곡선" },
+  { key: "alerts",   label: "알림로그" },
+  { key: "settings", label: "설정"     },
+];
+
 export default function App() {
   const [portfolio,    setPortfolio]    = useState(null);
   const [trades,       setTrades]       = useState([]);
   const [alerts,       setAlerts]       = useState([]);
   const [stats,        setStats]        = useState(null);
   const [streamPrices, setStreamPrices] = useState({});
-  const [tab,          setTab]          = useState(0);
+  const [tab,          setTab]          = useState("pos");
   const [wsStatus,     setWsStatus]     = useState("connecting");
   const alertPollRef = useRef(null);
   const rate  = useExchangeRate();
   const toast = useToast();
   const now   = useClock();
 
-  // ── Load all data ────────────────────────────────────────────────────────
   const load = useCallback(async () => {
     try {
-      const [portfolio, trades, alerts, stats] = await Promise.all([
+      const [p, t, a, s] = await Promise.all([
         apiFetch("/api/portfolio"),
         apiFetch("/api/trades"),
         apiFetch("/api/alerts"),
         apiFetch("/api/stats"),
       ]);
-      setPortfolio(portfolio);
-      setTrades(trades);
-      setAlerts(alerts);
-      setStats(stats);
+      setPortfolio(p);
+      setTrades(t);
+      setAlerts(a);
+      setStats(s);
     } catch {}
   }, []);
 
   useEffect(() => { load(); }, [load]);
 
-  // Alert tab polling
   useEffect(() => {
-    if (tab === 3) {
+    if (tab === "alerts") {
       apiFetch("/api/alerts").then(setAlerts).catch(() => {});
       alertPollRef.current = setInterval(
         () => apiFetch("/api/alerts").then(setAlerts).catch(() => {}),
@@ -77,7 +104,6 @@ export default function App() {
     return () => clearInterval(alertPollRef.current);
   }, [tab]);
 
-  // ── Binance real-time stream ─────────────────────────────────────────────
   const streamSymbols = useMemo(() => {
     const tickers = portfolio?.positions?.map(p => p.ticker) ?? [];
     return [...new Set(["BTCUSDT", ...tickers])];
@@ -89,15 +115,14 @@ export default function App() {
 
   useBinanceStream(streamSymbols, onTick);
 
-  // ── App WebSocket ────────────────────────────────────────────────────────
   const onWsMessage = useCallback(msg => {
     if (msg.type === "trade") {
       load();
       const t = msg.trade;
       if (t) {
         const sideLabel = t.side === "long" ? "롱 진입" : t.side === "short" ? "숏 진입" : "청산";
-        const pnl = t.realized_pnl;
-        const pnlTxt = pnl ? ` · 손익 ${fmtKrw(pnl, rate, pnl >= 0)}` : "";
+        const pnl       = t.realized_pnl;
+        const pnlTxt    = pnl ? ` · 손익 ${fmtKrw(pnl, rate, pnl >= 0)}` : "";
         toast(`${sideLabel} 체결 @ ${fmtKrw(t.price, rate)}${pnlTxt}`,
               pnl < 0 ? "error" : "success");
       }
@@ -107,80 +132,97 @@ export default function App() {
 
   useWebSocket(WS_URL, onWsMessage, useCallback(() => setWsStatus("connected"), []));
 
-  const handleTab = (i) => {
-    setTab(i);
-    if (i === 3) apiFetch("/api/alerts").then(setAlerts).catch(() => {});
-    if (i === 1) apiFetch("/api/trades").then(setTrades).catch(() => {});
+  const handleTab = (k) => {
+    setTab(k);
+    if (k === "alerts") apiFetch("/api/alerts").then(setAlerts).catch(() => {});
+    if (k === "trades") apiFetch("/api/trades").then(setTrades).catch(() => {});
   };
 
+  const btcData   = streamPrices["BTCUSDT"];
   const connected = wsStatus === "connected";
 
   return (
-    <div className="min-h-screen">
-      {/* ── Sticky header ── */}
-      <header className="sticky top-0 z-40 border-b border-white/[0.06] bg-ink-950/70 backdrop-blur-xl">
-        <div className="max-w-7xl mx-auto px-3 sm:px-5 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-brand-500 to-emerald-500
-                            grid place-items-center font-black text-white text-sm shadow-glow">
-              P
-            </div>
-            <div className="leading-none">
-              <h1 className="text-base font-extrabold tracking-tight brand-text">Paper Futures</h1>
-              <p className="text-[10px] text-gray-600 mt-0.5">TradingView 웹훅 모의 선물거래</p>
-            </div>
-          </div>
+    <div className="h-screen flex flex-col bg-ink-950 overflow-hidden">
 
-          <div className="flex items-center gap-3">
-            <span className="hidden sm:block text-xs text-gray-500 tabular-nums font-mono">
-              {now.toLocaleTimeString("ko", { hour12: false })}
-            </span>
-            <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold
-              ${connected ? "bg-emerald-500/10 text-emerald-300" : "bg-gray-500/10 text-gray-400"}`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${connected ? "bg-emerald-400 animate-pulse-ring" : "bg-gray-600"}`} />
-              {connected ? "실시간" : "연결 중"}
-            </div>
+      {/* ── Top Navigation ── */}
+      <header className="h-14 shrink-0 flex items-center border-b border-ink-700 bg-ink-900 z-40">
+        {/* Logo block */}
+        <div className="flex items-center gap-2.5 px-4 border-r border-ink-700 h-full shrink-0">
+          <div className="w-7 h-7 rounded bg-brand-500 grid place-items-center font-black text-black text-sm select-none">
+            P
+          </div>
+          <span className="font-bold text-gray-100 text-sm hidden sm:block tracking-tight">Paper Futures</span>
+        </div>
+
+        {/* Market stats */}
+        <div className="flex-1 min-w-0">
+          <MarketBar data={btcData} rate={rate} />
+        </div>
+
+        {/* Right: clock + connection */}
+        <div className="flex items-center gap-3 px-4 shrink-0">
+          <span className="hidden md:block text-xs text-gray-600 font-mono tabular-nums">
+            {now.toLocaleTimeString("ko", { hour12: false })}
+          </span>
+          <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-semibold border
+            ${connected
+              ? "border-up/25 bg-up/8 text-up"
+              : "border-ink-700 bg-ink-800 text-gray-500"}`}>
+            <span className={`w-1.5 h-1.5 rounded-full shrink-0
+              ${connected ? "bg-up animate-pulse-ring" : "bg-gray-600"}`} />
+            <span className="hidden sm:inline">{connected ? "실시간" : "연결 중"}</span>
           </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto p-3 sm:p-5 space-y-5">
-        <LiveTicker data={streamPrices["BTCUSDT"]} rate={rate} />
-        <Summary   portfolio={portfolio} streamPrices={streamPrices} rate={rate} />
-        <Stats     stats={stats} rate={rate} />
+      {/* ── Exchange Body ── */}
+      <div className="flex flex-1 min-h-0 overflow-hidden">
 
-        {/* ── Tabs ── */}
-        <div className="sticky top-14 z-30 -mx-3 sm:mx-0 px-3 sm:px-0 py-1 bg-ink-950/60 backdrop-blur">
-          <div className="flex gap-1 overflow-x-auto card p-1.5">
-            {TABS.map((t, i) => {
-              const Icon = t.icon;
-              return (
-                <button key={t.name} onClick={() => handleTab(i)}
-                  className={`flex-shrink-0 flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-semibold transition-all ${
-                    tab === i
-                      ? "bg-gradient-to-b from-brand-500 to-brand-600 text-white shadow-[0_4px_16px_-6px_rgba(79,70,229,0.7)]"
-                      : "text-gray-500 hover:text-white hover:bg-white/[0.05]"
-                  }`}>
-                  <Icon width={16} />
-                  <span className="whitespace-nowrap">{t.name}</span>
-                </button>
-              );
-            })}
+        {/* ── Left Sidebar (desktop ≥ lg) ── */}
+        <aside className="hidden lg:flex flex-col w-72 shrink-0 border-r border-ink-700 bg-ink-900 overflow-y-auto">
+          <OrderPanel
+            portfolio={portfolio}
+            streamPrices={streamPrices}
+            stats={stats}
+            rate={rate}
+            onTrade={load}
+          />
+        </aside>
+
+        {/* ── Right Content ── */}
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+
+          {/* Mobile account bar */}
+          <div className="lg:hidden shrink-0">
+            <MobileAccountBar portfolio={portfolio} streamPrices={streamPrices} rate={rate} />
+          </div>
+
+          {/* Tab bar */}
+          <div className="flex border-b border-ink-700 bg-ink-900 overflow-x-auto shrink-0">
+            {TABS.map(t => (
+              <button key={t.key} onClick={() => handleTab(t.key)}
+                className={`ex-tab ${tab === t.key ? "ex-tab-active" : ""}`}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Tab content */}
+          <div className="flex-1 overflow-auto p-4 animate-fade-up">
+            {tab === "pos"      && <Positions positions={portfolio?.positions} streamPrices={streamPrices} rate={rate} onClosed={load} />}
+            {tab === "trades"   && <Trades    trades={trades} rate={rate} />}
+            {tab === "stats"    && <Stats     stats={stats} rate={rate} />}
+            {tab === "chart"    && <EquityCurve history={portfolio?.balance_history} rate={rate} />}
+            {tab === "alerts"   && <AlertLogs logs={alerts} />}
+            {tab === "settings" && <Settings  onReset={load} onTrade={load} rate={rate} />}
+          </div>
+
+          {/* Footer */}
+          <div className="text-center text-[10px] text-gray-700 py-1.5 border-t border-ink-700 bg-ink-900 shrink-0">
+            모의 거래 전용 · 실제 주문 없음 · ₩{Math.round(rate).toLocaleString()}/$
           </div>
         </div>
-
-        <div className="card card-hover p-4 sm:p-5 min-h-[20rem] animate-fade-up">
-          {tab === 0 && <Positions  positions={portfolio?.positions} streamPrices={streamPrices} rate={rate} onClosed={load} />}
-          {tab === 1 && <Trades     trades={trades} rate={rate} />}
-          {tab === 2 && <EquityCurve history={portfolio?.balance_history} rate={rate} />}
-          {tab === 3 && <AlertLogs  logs={alerts} />}
-          {tab === 4 && <Settings   onReset={load} onTrade={load} rate={rate} />}
-        </div>
-
-        <footer className="text-center text-[11px] text-gray-700 pt-2 pb-6">
-          모의 거래 전용 · 실제 주문은 발생하지 않습니다 · 환율 ₩{Math.round(rate).toLocaleString()}/$
-        </footer>
-      </main>
+      </div>
     </div>
   );
 }

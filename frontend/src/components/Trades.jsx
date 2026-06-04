@@ -1,20 +1,20 @@
 import { useState, useMemo } from "react";
 import { fmtKrw } from "../fmt";
 
-const PAGE = 15;
+const PAGE = 20;
 
 const SIDE = {
-  long:  { label: "롱",   cls: "pill-long"  },
-  short: { label: "숏",   cls: "pill-short" },
-  close: { label: "청산", cls: "pill-flat"  },
-  buy:   { label: "롱",   cls: "pill-long"  },
-  sell:  { label: "숏",   cls: "pill-short" },
+  long:  { label: "LONG",  cls: "pill-long"  },
+  short: { label: "SHORT", cls: "pill-short" },
+  close: { label: "청산",  cls: "pill-flat"  },
+  buy:   { label: "LONG",  cls: "pill-long"  },
+  sell:  { label: "SHORT", cls: "pill-short" },
 };
 
 const FILTERS = [
   { key: "all",   label: "전체" },
-  { key: "long",  label: "롱" },
-  { key: "short", label: "숏" },
+  { key: "long",  label: "롱"   },
+  { key: "short", label: "숏"   },
   { key: "close", label: "청산" },
 ];
 
@@ -22,17 +22,17 @@ function MobileCard({ t, rate }) {
   const pnlPos = t.realized_pnl >= 0;
   const s = SIDE[t.side] ?? { label: t.side, cls: "pill-flat" };
   return (
-    <div className="card card-hover p-3 text-xs space-y-2">
+    <div className="bg-ink-850 border border-ink-700 rounded-xl p-3 text-xs space-y-2">
       <div className="flex items-center gap-2">
         <span className={`pill ${s.cls}`}>{s.label}</span>
         <span className="font-bold text-sm text-white">{t.ticker}</span>
-        <span className="text-gray-600 ml-auto whitespace-nowrap font-mono">
-          {new Date(t.ts).toLocaleString("ko",{month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"})}
+        <span className="text-gray-600 ml-auto font-mono tabular-nums">
+          {new Date(t.ts).toLocaleString("ko", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}
         </span>
       </div>
       <div className="flex items-center justify-between">
-        <span className="text-gray-400 tabular-nums">{fmtKrw(t.price, rate)}</span>
-        <span className={`font-bold tabular-nums ${t.realized_pnl === 0 ? "text-gray-600" : pnlPos ? "val-pos" : "val-neg"}`}>
+        <span className="text-gray-400 tabular-nums font-mono">{fmtKrw(t.price, rate)}</span>
+        <span className={`font-bold tabular-nums ${t.realized_pnl === 0 ? "text-gray-600" : pnlPos ? "text-up" : "text-down"}`}>
           {t.realized_pnl === 0 ? "—" : fmtKrw(t.realized_pnl, rate, pnlPos)}
         </span>
       </div>
@@ -41,12 +41,12 @@ function MobileCard({ t, rate }) {
 }
 
 export default function Trades({ trades, rate }) {
-  const [page, setPage] = useState(0);
+  const [page,   setPage]   = useState(0);
   const [filter, setFilter] = useState("all");
 
   const filtered = useMemo(() => {
     if (filter === "all") return trades ?? [];
-    const norm = { long: ["long","buy"], short: ["short","sell"], close: ["close"] }[filter];
+    const norm = { long: ["long", "buy"], short: ["short", "sell"], close: ["close"] }[filter];
     return (trades ?? []).filter(t => norm.includes(t.side));
   }, [trades, filter]);
 
@@ -66,19 +66,22 @@ export default function Trades({ trades, rate }) {
 
   return (
     <div className="space-y-3">
-      {/* Filters + summary */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex gap-1 p-1 rounded-xl bg-ink-800/60 border border-white/[0.05]">
+      {/* Filter bar */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex border border-ink-700 rounded overflow-hidden">
           {FILTERS.map(f => (
             <button key={f.key} onClick={() => setF(f.key)}
-              className={`px-3 py-1 rounded-lg text-xs font-semibold transition ${
-                filter === f.key ? "bg-white/[0.08] text-white" : "text-gray-500 hover:text-gray-300"
-              }`}>{f.label}</button>
+              className={`px-3 py-1.5 text-xs font-semibold transition-colors
+                ${filter === f.key
+                  ? "bg-brand-500 text-black"
+                  : "bg-ink-800 text-gray-500 hover:text-gray-300"}`}>
+              {f.label}
+            </button>
           ))}
         </div>
         <div className="flex items-center gap-3 text-sm">
           <span className="text-gray-500">{filtered.length}건</span>
-          <span className={`font-bold tabular-nums ${totalPnl >= 0 ? "val-pos" : "val-neg"}`}>
+          <span className={`font-bold tabular-nums font-mono ${totalPnl >= 0 ? "text-up" : "text-down"}`}>
             {fmtKrw(totalPnl, rate, totalPnl >= 0)}
           </span>
         </div>
@@ -93,9 +96,11 @@ export default function Trades({ trades, rate }) {
       <div className="hidden md:block overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-white/[0.06]">
-              {["시각","종목","방향","체결가","수량","수수료","실현손익","전략"].map(h => (
-                <th key={h} className="py-2.5 pr-4 text-left label">{h}</th>
+            <tr className="border-b border-ink-700">
+              {["시각", "종목", "방향", "체결가", "수량", "수수료", "실현손익", "전략"].map(h => (
+                <th key={h} className="py-3 pr-6 text-left text-xs font-medium text-gray-500 uppercase tracking-wide">
+                  {h}
+                </th>
               ))}
             </tr>
           </thead>
@@ -104,20 +109,20 @@ export default function Trades({ trades, rate }) {
               const pnlPos = t.realized_pnl >= 0;
               const s = SIDE[t.side] ?? { label: t.side, cls: "pill-flat" };
               return (
-                <tr key={t.id} className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors">
-                  <td className="py-2.5 pr-4 text-gray-600 text-xs whitespace-nowrap font-mono">
-                    {new Date(t.ts).toLocaleString("ko",{month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"})}
+                <tr key={t.id} className="border-b border-ink-700 hover:bg-ink-800/40 transition-colors">
+                  <td className="py-3 pr-6 text-gray-600 text-xs font-mono tabular-nums whitespace-nowrap">
+                    {new Date(t.ts).toLocaleString("ko", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}
                   </td>
-                  <td className="py-2.5 pr-4 font-semibold text-white">{t.ticker}</td>
-                  <td className="py-2.5 pr-4"><span className={`pill ${s.cls}`}>{s.label}</span></td>
-                  <td className="py-2.5 pr-4 tabular-nums">{fmtKrw(t.price, rate)}</td>
-                  <td className="py-2.5 pr-4 tabular-nums text-gray-400">{t.qty.toFixed(6)}</td>
-                  <td className="py-2.5 pr-4 tabular-nums text-gray-500">{fmtKrw(t.fee, rate)}</td>
-                  <td className={`py-2.5 pr-4 tabular-nums font-bold ${
-                    t.realized_pnl === 0 ? "text-gray-600" : pnlPos ? "val-pos" : "val-neg"}`}>
+                  <td className="py-3 pr-6 font-semibold text-gray-100">{t.ticker}</td>
+                  <td className="py-3 pr-6"><span className={`pill ${s.cls}`}>{s.label}</span></td>
+                  <td className="py-3 pr-6 tabular-nums font-mono text-gray-300">{fmtKrw(t.price, rate)}</td>
+                  <td className="py-3 pr-6 tabular-nums font-mono text-gray-400">{t.qty.toFixed(6)}</td>
+                  <td className="py-3 pr-6 tabular-nums font-mono text-gray-500">{fmtKrw(t.fee, rate)}</td>
+                  <td className={`py-3 pr-6 tabular-nums font-bold font-mono ${
+                    t.realized_pnl === 0 ? "text-gray-600" : pnlPos ? "text-up" : "text-down"}`}>
                     {t.realized_pnl === 0 ? "—" : fmtKrw(t.realized_pnl, rate, pnlPos)}
                   </td>
-                  <td className="py-2.5 text-gray-600 text-xs">{t.strategy ?? "—"}</td>
+                  <td className="py-3 text-gray-600 text-xs">{t.strategy ?? "—"}</td>
                 </tr>
               );
             })}
@@ -128,9 +133,11 @@ export default function Trades({ trades, rate }) {
       {/* Pagination */}
       {pages > 1 && (
         <div className="flex items-center justify-center gap-2 pt-1">
-          <button disabled={page === 0} onClick={() => setPage(p => p - 1)} className="btn-ghost px-3 py-1.5 text-xs">← 이전</button>
-          <span className="text-xs text-gray-500 px-2 tabular-nums">{page + 1} / {pages}</span>
-          <button disabled={page >= pages - 1} onClick={() => setPage(p => p + 1)} className="btn-ghost px-3 py-1.5 text-xs">다음 →</button>
+          <button disabled={page === 0} onClick={() => setPage(p => p - 1)}
+            className="btn-ghost px-3 py-1.5 text-xs rounded">← 이전</button>
+          <span className="text-xs text-gray-500 tabular-nums">{page + 1} / {pages}</span>
+          <button disabled={page >= pages - 1} onClick={() => setPage(p => p + 1)}
+            className="btn-ghost px-3 py-1.5 text-xs rounded">다음 →</button>
         </div>
       )}
     </div>
